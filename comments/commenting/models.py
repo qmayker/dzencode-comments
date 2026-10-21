@@ -1,9 +1,9 @@
 from django.db import models
-
+from core.models import TimeStampedModel
 from .validators import UserNameValidator
 
 
-class CommentAuthor(models.Model):
+class CommentAuthor(TimeStampedModel):
     username = models.CharField(
         max_length=100, validators=[UserNameValidator()], unique=True
     )
@@ -14,7 +14,7 @@ class CommentAuthor(models.Model):
         return f"{self.username}"
 
 
-class Comment(models.Model):
+class Comment(TimeStampedModel):
     author = models.ForeignKey(
         CommentAuthor, on_delete=models.CASCADE, related_name="comments"
     )
