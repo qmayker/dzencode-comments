@@ -28,3 +28,10 @@ class CommentTextTagsValidator:
         if is_valid:
             return
         raise ValidationError("Tags are not closed properly")
+
+    def deconstruct(self):
+        return (
+            f"{self.__class__.__module__}.{self.__class__.__qualname__}",
+            (),
+            {},
+        )
