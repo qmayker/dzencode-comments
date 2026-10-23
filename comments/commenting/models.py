@@ -1,11 +1,14 @@
-from django.db import models
 from core.models import TimeStampedModel
-from .validators import UserNameValidator
+from django.db import models
+
+from .validators import CommentTextTagsValidator, UserNameValidator
 
 
 class CommentAuthor(TimeStampedModel):
     username = models.CharField(
-        max_length=100, validators=[UserNameValidator()], unique=True
+        max_length=100,
+        validators=[UserNameValidator()],
+        unique=True,
     )
     email = models.EmailField(unique=True)
     home_page = models.URLField(null=True, blank=True)
@@ -21,7 +24,7 @@ class Comment(TimeStampedModel):
     related_comment = models.ForeignKey(
         "self", null=True, blank=True, related_name="replies", on_delete=models.CASCADE
     )
-    text = models.TextField(max_length=2000)
+    text = models.TextField(max_length=2000, validators=[CommentTextTagsValidator()])
 
     def __str__(self):
-        return f"{self.author.username} {self.text[:25]}"
+        return f"{self.author.username} {self.text[:50]}"
