@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Коментарі</title>
+    <link rel="stylesheet" href="{% static 'commenting/comment_list.css' %}">
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <p class="eyebrow">Обговорення</p>
+        <h1>Коментарі</h1>
+      </header>
+
+      <form class="sort-form" method="get">
+        <label for="field">Сортувати за</label>
+        <select id="field" name="field">
+          <option value="created"{% if request.GET.field == "created" or not request.GET.field %} selected{% endif %}>Датою створення</option>
+          <option value="username"{% if request.GET.field == "username" %} selected{% endif %}>Ім'ям автора</option>
+          <option value="email"{% if request.GET.field == "email" %} selected{% endif %}>Електронною поштою</option>
+        </select>
+        <select name="orderingType" aria-label="Напрямок сортування">
+          <option value="desc"{% if request.GET.orderingType == "desc" or not request.GET.orderingType %} selected{% endif %}>За спаданням</option>
+          <option value="asc"{% if request.GET.orderingType == "asc" %} selected{% endif %}>За зростанням</option>
+        </select>
+        <button type="submit">Застосувати</button>
+      </form>
+
+      <section class="comment-list" aria-label="Список коментарів">
+        {% for comment in comment_list %}
+          <article class="comment">
+            <header class="comment-header">
+              <strong class="comment-author">{{ comment.author.username }}</strong>
+              <time class="comment-date" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"d.m.Y H:i" }}</time>
+            </header>
+            <div class="comment-body">{{ comment.text|safe }}</div>
+          </article>
+        {% empty %}
+          <p class="empty-state">Коментарів поки немає.</p>
+        {% endfor %}
+      </section>
+
+      {% if is_paginated %}
+        <nav class="pagination" aria-label="Сторінки коментарів">
+          {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}&field={{ request.GET.field|default:'created'|urlencode }}&orderingType={{ request.GET.orderingType|default:'desc'|urlencode }}">Попередня</a>
+          {% endif %}
+
+          <span class="page-count">Сторінка {{ page_obj.number }} з {{ page_obj.paginator.num_pages }}</span>
+
+          {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&field={{ request.GET.field|default:'created'|urlencode }}&orderingType={{ request.GET.orderingType|default:'desc'|urlencode }}">Наступна</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    </main>
+  </body>
+</html>

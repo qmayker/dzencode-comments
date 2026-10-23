@@ -28,3 +28,7 @@ class Comment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.author.username} {self.text[:50]}"
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["created_at", "id"])]
