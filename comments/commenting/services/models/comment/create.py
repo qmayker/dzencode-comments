@@ -5,6 +5,8 @@ from .validation import CommentValidation, CommentValidationData
 
 
 class BaseCommentService:
+    model = Comment
+
     def __init__(self, obj: Comment):
         self.obj = obj
         self.data = CommentValidationData(text=self.obj.text)
@@ -19,17 +21,16 @@ class BaseCommentService:
         return self.obj
 
 
-class CommentService(BaseCommentService, CommentValidation):
-    model = Comment
+class CommentMixin(BaseCommentService, CommentValidation): ...
 
+
+class CommentService(CommentMixin):
     def save(self):
         self.validate(self.data)
         return super().save()
 
 
-class CommentCreateService(BaseCommentService, CommentValidation):
-    model = Comment
-
+class CommentCreateService(CommentMixin):
     def __init__(
         self, text: str, author_id: int, related_comment_id: int | None = None
     ):
