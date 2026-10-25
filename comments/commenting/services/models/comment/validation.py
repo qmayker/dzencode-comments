@@ -1,19 +1,7 @@
-from abc import ABC
-from dataclasses import dataclass
-
-from commenting.validators import CommentTextTagsValidator
+from commenting.models import Comment
+from core.validators import BaseValidator
 
 
-@dataclass
-class CommentValidationData:
-    text: str
-
-
-class CommentValidation(ABC):
-    @staticmethod
-    def validate_text(text: str) -> str:
-        CommentTextTagsValidator()(text)
-        return text
-
-    def validate(self, data: CommentValidationData) -> None:
-        self.validate_text(data.text)
+class CommentValidation(BaseValidator[Comment]):
+    def validate(self) -> None:
+        self.obj.full_clean()

@@ -1,36 +1,24 @@
 from commenting.models import Comment
+from core.services import BaseModelService
 
 from .text import CommentTextSanitizer
-from .validation import CommentValidation, CommentValidationData
+from .validation import CommentValidation
 
 
-class BaseCommentService:
-    model = Comment
+class CommentService(BaseModelService):
+    validator_class = CommentValidation
 
-    def __init__(self, obj: Comment):
-        self.obj = obj
-        self.data = CommentValidationData(text=self.obj.text)
-
-    def get_text(self, text: str) -> str:
+    def clean_text(self, text: str) -> str:
         self.text_result = CommentTextSanitizer().clean(text)
         return self.text_result.text
 
-    def save(self) -> Comment:
-        self.obj.text = self.get_text(self.data.text)
-        self.obj.save()
-        return self.obj
+    def clean(self):
+        self.obj.text = self.clean_text(self.obj.text)
 
 
-class CommentMixin(BaseCommentService, CommentValidation): ...
+class CommentCreateService(CommentService):
+    model = Comment
 
-
-class CommentService(CommentMixin):
-    def save(self):
-        self.validate(self.data)
-        return super().save()
-
-
-class CommentCreateService(CommentMixin):
     def __init__(
         self, text: str, author_id: int, related_comment_id: int | None = None
     ):
@@ -42,5 +30,4 @@ class CommentCreateService(CommentMixin):
         super().__init__(obj)
 
     def create(self):
-        self.validate(self.data)
         return self.save()

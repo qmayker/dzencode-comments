@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from commenting.services.models.comment.create import BaseCommentService
+from commenting.services.models.comment.create import CommentService
 
 from .models import Comment, CommentAuthor
 
@@ -17,5 +17,5 @@ class CommentAdmin(admin.ModelAdmin):
     search_fields = ("author__username", "author__email")
 
     def save_model(self, request, obj, form, change):
-        service = BaseCommentService(obj)
+        service = CommentService(obj)
         service.save()
