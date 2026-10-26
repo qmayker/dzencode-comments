@@ -6,6 +6,8 @@ from .validation import CommentValidation
 
 
 class CommentService(BaseModelService[Comment]):
+    validator_class = CommentValidation
+
     def clean_text(self, text: str) -> str:
         self.text_result = CommentTextSanitizer().clean(text)
         return self.text_result.text
@@ -16,7 +18,6 @@ class CommentService(BaseModelService[Comment]):
 
 class CommentCreateService(BaseModelCreateService[Comment], CommentService):
     model = Comment
-    validator_class = CommentValidation
 
     def __init__(
         self, text: str, author_id: int, related_comment_id: int | None = None

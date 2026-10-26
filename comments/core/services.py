@@ -7,6 +7,13 @@ from .validators import BaseValidator
 
 
 class BaseModelService[M: Model](ABC):
+    validator_class: ClassVar[type[BaseValidator[M]] | None] = None
+
+    def validate(self) -> None:
+        if self.validator_class is None:
+            raise NotImplementedError("")
+        self.validator_class(self.obj).validate()
+
     def __init__(self, obj: M):
         self.obj = obj
 
@@ -14,18 +21,14 @@ class BaseModelService[M: Model](ABC):
         pass
 
     def save(self, update_fields: list[str] | None = None) -> M:
+        self.validate()
         self.clean()
         self.obj.save(update_fields=update_fields)
         return self.obj
 
 
 class BaseModelCreateService[M: Model](BaseModelService[M], ABC):
-    validator_class: ClassVar[type[BaseValidator[M]] | None] = None
-
-    def validate(self) -> None:
-        if self.validator_class is not None:
-            self.validator_class(self.obj).validate()
+    model: M
 
     def create(self) -> M:
-        self.validate()
         return self.save()
