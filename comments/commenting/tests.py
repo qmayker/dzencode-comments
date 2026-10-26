@@ -2,6 +2,11 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from commenting.models import Comment, CommentAuthor
+from commenting.services.models.author.create import (
+    CommentAuthorService,
+    CreateCommentAuthorService,
+)
+from commenting.services.models.author.operations import get_or_create
 from commenting.services.models.comment.create import (
     CommentCreateService,
     CommentService,
@@ -67,6 +72,96 @@ class CommentServiceTests(TestCase):
 
         self.assertIsNone(service.obj.pk)
         self.assertEqual(Comment.objects.count(), 0)
+
+
+class CommentAuthorServiceTests(TestCase):
+    def setUp(self):
+        self.author = CommentAuthor.objects.create(
+            username="existingauthor",
+            email="existing@example.com",
+            home_page="https://old.example.com",
+        )
+
+    def test_create_service_validates_and_saves_author(self):
+        service = CreateCommentAuthorService(
+            username="newauthor",
+            email="new@example.com",
+            home_page="https://example.com",
+        )
+
+        author = service.create()
+
+        self.assertEqual(author, service.obj)
+        self.assertIsNotNone(author.pk)
+        self.assertEqual(author.username, "newauthor")
+        self.assertEqual(CommentAuthor.objects.count(), 2)
+
+    def test_create_service_rejects_duplicate_username(self):
+        service = CreateCommentAuthorService(
+            username=self.author.username,
+            email="another@example.com",
+            home_page=None,
+        )
+
+        with self.assertRaises(ValidationError):
+            service.create()
+
+        self.assertIsNone(service.obj.pk)
+        self.assertEqual(CommentAuthor.objects.count(), 1)
+
+    def test_create_service_rejects_duplicate_email(self):
+        service = CreateCommentAuthorService(
+            username="anotherauthor",
+            email=self.author.email,
+            home_page=None,
+        )
+
+        with self.assertRaises(ValidationError):
+            service.create()
+
+        self.assertIsNone(service.obj.pk)
+        self.assertEqual(CommentAuthor.objects.count(), 1)
+
+    def test_update_home_page_url_saves_author(self):
+        service = CommentAuthorService(self.author)
+
+        service.update_home_page_url("https://new.example.com")
+
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.home_page, "https://new.example.com")
+
+    def test_get_or_create_creates_author_when_missing(self):
+        author = get_or_create(
+            username="newauthor",
+            email="new@example.com",
+            home_page="https://example.com",
+        )
+
+        self.assertEqual(author.username, "newauthor")
+        self.assertEqual(author.email, "new@example.com")
+        self.assertEqual(CommentAuthor.objects.count(), 2)
+
+    def test_get_or_create_returns_existing_author_and_updates_home_page(self):
+        author = get_or_create(
+            username=self.author.username,
+            email=self.author.email,
+            home_page="https://new.example.com",
+        )
+
+        self.author.refresh_from_db()
+        self.assertEqual(author.pk, self.author.pk)
+        self.assertEqual(self.author.home_page, "https://new.example.com")
+        self.assertEqual(CommentAuthor.objects.count(), 1)
+
+    def test_get_or_create_without_home_page_preserves_existing_url(self):
+        author = get_or_create(
+            username=self.author.username,
+            email=self.author.email,
+        )
+
+        self.author.refresh_from_db()
+        self.assertEqual(author.pk, self.author.pk)
+        self.assertEqual(self.author.home_page, "https://old.example.com")
 
 
 class CommentListViewTests(TestCase):

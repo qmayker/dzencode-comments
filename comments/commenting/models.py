@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from core.models import TimeStampedModel
 from django.db import models
 
+from .services.models.author.managers import CommentAuthorManager
 from .validators import CommentTextTagsValidator, UserNameValidator
 
 
 class CommentAuthor(TimeStampedModel):
+    objects = CommentAuthorManager()
+
     username = models.CharField(
         max_length=100,
         validators=[UserNameValidator()],
