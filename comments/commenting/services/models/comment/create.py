@@ -1,13 +1,11 @@
 from commenting.models import Comment
-from core.services import BaseModelService
+from core.services import BaseModelCreateService, BaseModelService
 
 from .text import CommentTextSanitizer
 from .validation import CommentValidation
 
 
-class CommentService(BaseModelService):
-    validator_class = CommentValidation
-
+class CommentService(BaseModelService[Comment]):
     def clean_text(self, text: str) -> str:
         self.text_result = CommentTextSanitizer().clean(text)
         return self.text_result.text
@@ -16,8 +14,9 @@ class CommentService(BaseModelService):
         self.obj.text = self.clean_text(self.obj.text)
 
 
-class CommentCreateService(CommentService):
+class CommentCreateService(BaseModelCreateService[Comment], CommentService):
     model = Comment
+    validator_class = CommentValidation
 
     def __init__(
         self, text: str, author_id: int, related_comment_id: int | None = None
@@ -28,6 +27,3 @@ class CommentCreateService(CommentService):
             related_comment_id=related_comment_id,
         )
         super().__init__(obj)
-
-    def create(self):
-        return self.save()

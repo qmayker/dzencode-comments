@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import ClassVar
 
 from django.db.models import Model
@@ -6,28 +6,26 @@ from django.db.models import Model
 from .validators import BaseValidator
 
 
-class BaseService[M: Model](ABC):
-    @abstractmethod
-    def save(self) -> M:
-        raise NotImplementedError
-
-
-class BaseModelService[M: Model](BaseService[M], ABC):
-    validator_class: ClassVar[type[BaseValidator[M]] | None] = None
-
+class BaseModelService[M: Model](ABC):
     def __init__(self, obj: M):
         self.obj = obj
 
     def clean(self) -> None:
         pass
 
+    def save(self, update_fields: list[str] | None = None) -> M:
+        self.clean()
+        self.obj.save(update_fields=update_fields)
+        return self.obj
+
+
+class BaseModelCreateService[M: Model](BaseModelService[M], ABC):
+    validator_class: ClassVar[type[BaseValidator[M]] | None] = None
+
     def validate(self) -> None:
         if self.validator_class is not None:
             self.validator_class(self.obj).validate()
 
-    def save(self, validate: bool = True) -> M:
-        if validate:
-            self.validate()
-        self.clean()
-        self.obj.save()
-        return self.obj
+    def create(self) -> M:
+        self.validate()
+        return self.save()
