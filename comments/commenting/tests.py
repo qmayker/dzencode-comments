@@ -182,7 +182,36 @@ class CommentListViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["comment_list"]), 25)
+        self.assertContains(response, 'id="comment-create-form"')
         self.assertContains(response, "Наступна")
+
+    def test_comment_create_form_is_displayed_before_sort_form(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(
+            content.index('id="comment-create-form"'),
+            content.index('class="sort-form"'),
+        )
+
+    def test_comment_create_form_does_not_include_reply_field(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "related_comment_id")
+        self.assertNotContains(response, "Відповідь на коментар")
+
+    def test_each_comment_element_includes_its_id_as_data_attribute(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        for comment in response.context["comment_list"]:
+            with self.subTest(comment_id=comment.id):
+                self.assertContains(
+                    response,
+                    f'data-comment-id="{comment.id}"',
+                )
 
     def test_comment_list_shows_remaining_comment_on_second_page(self):
         response = self.client.get("/", {"page": 2})

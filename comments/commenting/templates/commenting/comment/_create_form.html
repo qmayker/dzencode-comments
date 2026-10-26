@@ -1,0 +1,15 @@
+<section class="comment-create" aria-labelledby="comment-create-title">
+  <h2 id="comment-create-title">Залишити коментар</h2>
+  <form id="comment-create-form" data-api-form="comment-create">
+    {% for field in comment_form %}
+      <div class="form-field{% if field.name == 'text' %} form-field-comment{% endif %}">
+        {{ field.label_tag }}
+        {{ field }}
+        {% for error in field.errors %}
+          <p class="form-error">{{ error }}</p>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    <button type="submit">Надіслати коментар</button>
+  </form>
+</section>

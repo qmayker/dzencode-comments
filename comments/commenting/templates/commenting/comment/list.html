@@ -14,6 +14,8 @@
         <h1>Коментарі</h1>
       </header>
 
+      {% include "commenting/comment/_create_form.html" %}
+
       <form class="sort-form" method="get">
         <label for="field">Сортувати за</label>
         <select id="field" name="field">
@@ -30,7 +32,7 @@
 
       <section class="comment-list" aria-label="Список коментарів">
         {% for comment in comment_list %}
-          <article class="comment">
+          <article class="comment" data-comment-id="{{ comment.id }}">
             <header class="comment-header">
               <strong class="comment-author">{{ comment.author.username }}</strong>
               <time class="comment-date" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"d.m.Y H:i" }}</time>

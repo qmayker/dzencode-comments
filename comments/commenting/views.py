@@ -2,6 +2,7 @@ from enum import StrEnum
 
 from django.views.generic import ListView
 
+from commenting.forms import CommentCreateForm
 from commenting.models import Comment
 
 
@@ -44,3 +45,8 @@ class CommentListView(ListView):
         if ordering is None:
             return super().get_ordering()
         return [ordering]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["comment_form"] = CommentCreateForm()
+        return context
