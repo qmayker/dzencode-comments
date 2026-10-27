@@ -50,13 +50,18 @@ h1 {
   background: #fff;
 }
 
+.comment-reply-form {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
 .comment-create h2 {
   margin: 0 0 16px;
   color: #111827;
   font-size: 1.25rem;
 }
 
-#comment-create-form {
+.comment-create form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
@@ -75,7 +80,7 @@ h1 {
 
 .form-field input,
 .form-field textarea,
-#comment-create-form button {
+.comment-create form button {
   width: 100%;
   min-height: 42px;
   padding: 10px 12px;
@@ -99,7 +104,7 @@ h1 {
   font-size: 0.85rem;
 }
 
-#comment-create-form button {
+.comment-create form button[type="submit"] {
   width: auto;
   justify-self: start;
   padding: 0 16px;
@@ -110,7 +115,7 @@ h1 {
   cursor: pointer;
 }
 
-#comment-create-form button:hover {
+.comment-create form button[type="submit"]:hover {
   background: #4053ad;
 }
 
@@ -212,6 +217,25 @@ h1 {
   font-family: Consolas, "Courier New", monospace;
 }
 
+.comment-actions {
+  margin-top: 12px;
+}
+
+.comment-reply-button {
+  padding: 0;
+  border: 0;
+  color: #4053ad;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.comment-reply-button:hover {
+  text-decoration: underline;
+}
+
 .empty-state {
   margin: 0;
   padding: 32px 20px;
@@ -260,7 +284,7 @@ h1 {
     align-items: stretch;
   }
 
-  #comment-create-form {
+  .comment-create form {
     grid-template-columns: 1fr;
   }
 

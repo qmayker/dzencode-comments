@@ -308,12 +308,24 @@ class CommentListViewTests(TestCase):
             content.index('class="sort-form"'),
         )
 
-    def test_comment_create_form_does_not_include_reply_field(self):
+    def test_reply_form_is_rendered_once_inside_hidden_storage(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertEqual(content.count('id="comment-reply-form"'), 1)
+        self.assertIn(
+            '<div id="comment-reply-storage" hidden>',
+            content,
+        )
+        self.assertIn('id="reply_username"', content)
+
+    def test_forms_do_not_include_a_relation_input(self):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "related_comment_id")
-        self.assertNotContains(response, "Відповідь на коментар")
+        self.assertNotContains(response, 'name="related_comment"')
 
     def test_each_comment_element_includes_its_id_as_data_attribute(self):
         response = self.client.get("/")
@@ -325,6 +337,17 @@ class CommentListViewTests(TestCase):
                     response,
                     f'data-comment-id="{comment.id}"',
                 )
+
+    def test_each_comment_has_a_reply_button(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertEqual(
+            content.count('class="comment-reply-button"'),
+            len(response.context["comment_list"]),
+        )
+        self.assertContains(response, "Відповісти")
 
     def test_comment_list_shows_remaining_comment_on_second_page(self):
         response = self.client.get("/", {"page": 2})

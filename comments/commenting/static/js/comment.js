@@ -46,30 +46,56 @@ async function createComment({
 window.createComment = createComment;
 
 document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("comment-create-form");
-  if (!form) {
+  const mainForm = document.getElementById("comment-create-form");
+  const replyForm = document.getElementById("comment-reply-form");
+  const replySection = document.querySelector(".comment-reply-form");
+  const replyStorage = document.getElementById("comment-reply-storage");
+  if (!mainForm || !replyForm || !replySection || !replyStorage) {
     return;
   }
 
-  const status = document.getElementById("comment-form-status");
+  function attachSubmitHandler(form, getRelatedCommentId) {
+    const status = form.querySelector('[role="status"]');
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    status.textContent = "";
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      status.textContent = "";
 
-    const formData = new FormData(form);
-    try {
-      await createComment({
-        authorUrl: window.authorGetCreateUrl,
-        commentUrl: window.commentCreateUrl,
-        username: formData.get("username"),
-        email: formData.get("email"),
-        homePage: formData.get("home_page"),
-        text: formData.get("text"),
-      });
-      window.location.reload();
-    } catch (error) {
-      status.textContent = error.message;
-    }
+      const formData = new FormData(form);
+      try {
+        await createComment({
+          authorUrl: window.authorGetCreateUrl,
+          commentUrl: window.commentCreateUrl,
+          username: formData.get("username"),
+          email: formData.get("email"),
+          homePage: formData.get("home_page"),
+          text: formData.get("text"),
+          relatedCommentId: getRelatedCommentId(),
+        });
+        window.location.reload();
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+  }
+
+  let relatedCommentId = null;
+  attachSubmitHandler(mainForm, () => null);
+  attachSubmitHandler(replyForm, () => relatedCommentId);
+
+  document.querySelectorAll(".comment-reply-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const comment = button.closest(".comment");
+      if (replySection.parentElement === comment) {
+        replyStorage.append(replySection);
+        relatedCommentId = null;
+        return;
+      }
+
+      relatedCommentId = button.dataset.commentId;
+      comment.append(replySection);
+      replyForm.scrollIntoView({ behavior: "smooth", block: "center" });
+      replyForm.querySelector('[name="text"]').focus();
+    });
   });
 });

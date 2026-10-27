@@ -49,4 +49,5 @@ class CommentListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["comment_form"] = CommentCreateForm()
+        context["comment_reply_form"] = CommentCreateForm(auto_id="reply_%s")
         return context

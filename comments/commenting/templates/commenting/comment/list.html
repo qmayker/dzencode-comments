@@ -14,7 +14,10 @@
         <h1>Коментарі</h1>
       </header>
 
-      {% include "commenting/comment/_create_form.html" %}
+      {% include "commenting/comment/_create_form.html" with form=comment_form title="Залишити коментар" form_class="" title_id="comment-create-title" form_id="comment-create-form" status_id="comment-form-status" %}
+      <div id="comment-reply-storage" hidden>
+        {% include "commenting/comment/_create_form.html" with form=comment_reply_form title="Відповісти на коментар" form_class="comment-reply-form" title_id="comment-reply-title" form_id="comment-reply-form" status_id="comment-reply-status" %}
+      </div>
 
       <form class="sort-form" method="get">
         <label for="field">Сортувати за</label>
@@ -38,6 +41,14 @@
               <time class="comment-date" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"d.m.Y H:i" }}</time>
             </header>
             <div class="comment-body">{{ comment.text|safe }}</div>
+            <div class="comment-actions">
+              <button
+                class="comment-reply-button"
+                type="button"
+                data-comment-id="{{ comment.id }}"
+                data-comment-author="{{ comment.author.username }}"
+              >Відповісти</button>
+            </div>
           </article>
         {% empty %}
           <p class="empty-state">Коментарів поки немає.</p>
