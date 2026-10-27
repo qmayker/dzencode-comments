@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from commenting.models import Comment
 from commenting.services.models.author.operations import get_or_create
 from commenting.services.models.comment.create import CommentCreateService
 from rest_framework import status
@@ -7,7 +8,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import AuthorGetCreateSerializer, CommentCreateSerializer
+from .serializers import (
+    AuthorGetCreateSerializer,
+    CommentCreateSerializer,
+    CommentRepliesQuerySerializer,
+)
 
 
 class AuthorGetCreateView(APIView):
@@ -48,3 +53,16 @@ class CommentCreateView(APIView):
             CommentCreateSerializer(comment).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class CommentRepliesView(APIView):
+    def get(self, request: Request) -> Response:
+        serializer = CommentRepliesQuerySerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        related_comments = CommentCreateSerializer(
+            Comment.objects.for_related_comment(serializer.validated_data["comment"]),
+            many=True,
+        )
+        return Response(related_comments.data, status=status.HTTP_200_OK)

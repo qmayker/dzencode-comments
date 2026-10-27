@@ -21,3 +21,10 @@ class CommentCreateSerializer(ModelSerializer):
     class Meta:
         model = Comment
         fields = ["id", "related_comment", "text", "author"]
+
+
+class CommentRepliesQuerySerializer(serializers.Serializer):
+    comment_id = serializers.PrimaryKeyRelatedField(
+        source="comment",
+        queryset=Comment.objects.all(),
+    )

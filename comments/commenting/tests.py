@@ -188,6 +188,62 @@ class CommentCreateApiTests(TestCase):
         )
 
 
+class CommentRepliesApiTests(TestCase):
+    url = "/api/commenting/comments/replies/"
+
+    def setUp(self):
+        self.author = CommentAuthor.objects.create(
+            username="replies-api-author",
+            email="replies-api@example.com",
+        )
+        self.comment = Comment.objects.create(
+            author=self.author,
+            text="Main comment",
+        )
+        self.reply = Comment.objects.create(
+            author=self.author,
+            related_comment=self.comment,
+            text="Reply",
+        )
+        self.unrelated_comment = Comment.objects.create(
+            author=self.author,
+            text="Another main comment",
+        )
+        Comment.objects.create(
+            author=self.author,
+            related_comment=self.unrelated_comment,
+            text="Unrelated reply",
+        )
+
+    def test_get_returns_serialized_replies_for_comment_id(self):
+        response = self.client.get(self.url, {"comment_id": self.comment.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "id": self.reply.pk,
+                    "related_comment": self.comment.pk,
+                    "text": "Reply",
+                    "author": self.author.pk,
+                }
+            ],
+        )
+
+    def test_get_returns_bad_request_when_comment_id_is_missing(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("comment_id", response.data)
+
+    def test_get_returns_bad_request_when_comment_id_does_not_exist(self):
+        response = self.client.get(self.url, {"comment_id": 999})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("comment_id", response.data)
+
+
 class CommentAuthorServiceTests(TestCase):
     def setUp(self):
         self.author = CommentAuthor.objects.create(

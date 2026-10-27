@@ -1,10 +1,11 @@
 from django.urls import path
 
-from .views import AuthorGetCreateView, CommentCreateView
+from .views import AuthorGetCreateView, CommentCreateView, CommentRepliesView
 
 app_name = "commenting_api"
 
 urlpatterns = [
     path("authors/", AuthorGetCreateView.as_view(), name="author-get-create"),
     path("comments/", CommentCreateView.as_view(), name="comment-create"),
+    path("comments/replies/", CommentRepliesView.as_view(), name="comment-replies"),
 ]
