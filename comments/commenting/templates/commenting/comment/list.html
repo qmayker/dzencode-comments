@@ -58,5 +58,11 @@
         </nav>
       {% endif %}
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.8/dist/js.cookie.min.js"></script>
+    <script>
+      window.authorGetCreateUrl = "{% url 'api:commenting:author-get-create' %}";
+      window.commentCreateUrl = "{% url 'api:commenting:comment-create' %}";
+    </script>
+    <script src="{% static 'js/comment.js' %}"></script>
   </body>
 </html>

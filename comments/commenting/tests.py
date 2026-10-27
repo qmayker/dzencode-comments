@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from rest_framework import status
 
 from commenting.models import Comment, CommentAuthor
 from commenting.services.models.author.create import (
@@ -72,6 +73,80 @@ class CommentServiceTests(TestCase):
 
         self.assertIsNone(service.obj.pk)
         self.assertEqual(Comment.objects.count(), 0)
+
+
+class CommentCreateApiTests(TestCase):
+    url = "/api/commenting/comments/"
+
+    def test_author_response_can_be_used_to_create_comment(self):
+        author_response = self.client.post(
+            "/api/commenting/authors/",
+            data={
+                "username": "flowuser",
+                "email": "flow@example.com",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(
+            author_response.status_code,
+            status.HTTP_200_OK,
+            author_response.data,
+        )
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author_response.data["id"],
+                "text": "Created through the API flow",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Comment.objects.get().text, "Created through the API flow")
+
+    def test_post_creates_comment_for_author(self):
+        author = CommentAuthor.objects.create(
+            username="apiuser",
+            email="api@example.com",
+        )
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "API comment",
+                "related_comment": None,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["author"], author.pk)
+        self.assertEqual(Comment.objects.get().text, "API comment")
+
+    def test_post_creates_reply_with_related_comment(self):
+        author = CommentAuthor.objects.create(
+            username="replyuser",
+            email="reply@example.com",
+        )
+        parent = Comment.objects.create(author=author, text="Parent comment")
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "Reply comment",
+                "related_comment": parent.pk,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(
+            Comment.objects.get(pk=response.data["id"]).related_comment,
+            parent,
+        )
 
 
 class CommentAuthorServiceTests(TestCase):
@@ -162,6 +237,44 @@ class CommentAuthorServiceTests(TestCase):
         self.author.refresh_from_db()
         self.assertEqual(author.pk, self.author.pk)
         self.assertEqual(self.author.home_page, "https://old.example.com")
+
+
+class AuthorGetCreateApiTests(TestCase):
+    url = "/api/commenting/authors/"
+
+    def setUp(self):
+        self.author = CommentAuthor.objects.create(
+            username="existingauthor",
+            email="existing@example.com",
+        )
+
+    def test_post_returns_validation_error_for_email_used_by_another_author(self):
+        response = self.client.post(
+            self.url,
+            data={
+                "username": "differentauthor",
+                "email": self.author.email,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+        self.assertEqual(CommentAuthor.objects.count(), 1)
+
+    def test_post_returns_validation_error_for_username_used_by_another_author(self):
+        response = self.client.post(
+            self.url,
+            data={
+                "username": self.author.username,
+                "email": "different@example.com",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("username", response.data)
+        self.assertEqual(CommentAuthor.objects.count(), 1)
 
 
 class CommentListViewTests(TestCase):

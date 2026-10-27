@@ -17,9 +17,10 @@ Including another URLconf
 
 from commenting.views import CommentListView
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/", include("api.urls", namespace="api")),
     path("", CommentListView.as_view(), name="comment-list"),
 ]
