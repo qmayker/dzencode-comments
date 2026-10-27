@@ -75,6 +75,45 @@ class CommentServiceTests(TestCase):
         self.assertEqual(Comment.objects.count(), 0)
 
 
+class CommentQuerySetTests(TestCase):
+    def setUp(self):
+        self.author = CommentAuthor.objects.create(
+            username="queryset-author",
+            email="queryset@example.com",
+        )
+        self.main_comment = Comment.objects.create(
+            author=self.author,
+            text="Main comment",
+        )
+        self.reply = Comment.objects.create(
+            author=self.author,
+            text="Reply",
+            related_comment=self.main_comment,
+        )
+        self.other_main_comment = Comment.objects.create(
+            author=self.author,
+            text="Another main comment",
+        )
+
+    def test_main_comments_returns_only_comments_without_related_comment(self):
+        self.assertQuerySetEqual(
+            Comment.objects.main_comments(),
+            [self.other_main_comment, self.main_comment],
+        )
+
+    def test_for_related_comment_returns_replies_to_the_selected_comment(self):
+        self.assertQuerySetEqual(
+            Comment.objects.for_related_comment(self.main_comment),
+            [self.reply],
+        )
+
+    def test_for_related_comment_accepts_comment_id(self):
+        self.assertQuerySetEqual(
+            Comment.objects.for_related_comment(self.main_comment.pk),
+            [self.reply],
+        )
+
+
 class CommentCreateApiTests(TestCase):
     url = "/api/commenting/comments/"
 

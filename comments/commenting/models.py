@@ -4,6 +4,7 @@ from core.models import TimeStampedModel
 from django.db import models
 
 from .services.models.author.managers import CommentAuthorManager
+from .services.models.comment.managers import CommentManager
 from .validators import CommentTextTagsValidator, UserNameValidator
 
 
@@ -23,6 +24,8 @@ class CommentAuthor(TimeStampedModel):
 
 
 class Comment(TimeStampedModel):
+    objects = CommentManager()
+
     author = models.ForeignKey(
         CommentAuthor, on_delete=models.CASCADE, related_name="comments"
     )

@@ -1,5 +1,6 @@
 from enum import StrEnum
 
+from django.db.models import QuerySet
 from django.views.generic import ListView
 
 from commenting.forms import CommentCreateForm
@@ -37,6 +38,9 @@ class CommentListView(ListView):
             return
         ordering_field = self.ordering_fields[field]
         return selected_ordering.build_ordering_name(ordering_field)
+
+    def get_queryset(self) -> QuerySet[Comment]:
+        return super().get_queryset().main_comments()
 
     def get_ordering(self):
         ordering = self._get_ordering(
