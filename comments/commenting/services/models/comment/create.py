@@ -20,11 +20,16 @@ class CommentCreateService(BaseModelCreateService[Comment], CommentService):
     model = Comment
 
     def __init__(
-        self, text: str, author_id: int, related_comment_id: int | None = None
+        self,
+        text: str,
+        author_id: int,
+        target_comment_id: int | None = None,
+        related_comment_id: int | None = None,
     ):
         obj = self.model(
             text=text,
             author_id=author_id,
+            target_comment_id=target_comment_id,
             related_comment_id=related_comment_id,
         )
         super().__init__(obj)

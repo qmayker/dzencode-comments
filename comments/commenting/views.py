@@ -40,7 +40,10 @@ class CommentListView(ListView):
         return selected_ordering.build_ordering_name(ordering_field)
 
     def get_queryset(self) -> QuerySet[Comment]:
-        return super().get_queryset().main_comments()
+        return super().get_queryset().main_comments().prefetch_related(
+            "replies__author",
+            "replies__target_comment__author",
+        )
 
     def get_ordering(self):
         ordering = self._get_ordering(

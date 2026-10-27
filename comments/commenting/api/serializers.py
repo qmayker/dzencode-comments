@@ -20,7 +20,24 @@ class CommentCreateSerializer(ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ["id", "related_comment", "text", "author"]
+        fields = ["id", "related_comment", "target_comment", "text", "author"]
+
+    def validate(self, attrs):
+        related_comment = attrs.get("related_comment")
+        target_comment = attrs.get("target_comment")
+        if related_comment is None and target_comment is None:
+            return attrs
+        if related_comment is None or target_comment is None:
+            raise serializers.ValidationError(
+                {"related_comment": "Must be set together with target_comment."}
+            )
+
+        expected_related_id = target_comment.related_comment_id or target_comment.pk
+        if related_comment.pk != expected_related_id:
+            raise serializers.ValidationError(
+                {"related_comment": "Must be the root comment of the target thread."}
+            )
+        return attrs
 
 
 class CommentRepliesQuerySerializer(serializers.Serializer):

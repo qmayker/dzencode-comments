@@ -47,25 +47,49 @@ class CommentServiceTests(TestCase):
         self.assertIsNotNone(comment.pk)
         self.assertEqual(comment.text, "comment text")
         self.assertIsNone(comment.related_comment_id)
+        self.assertIsNone(comment.target_comment_id)
 
-    def test_create_service_links_reply_to_related_comment(self):
+    def test_create_service_sets_target_and_related_comment_for_main_reply(self):
         parent = Comment.objects.create(author=self.author, text="Parent comment")
         service = CommentCreateService(
             text="Reply text",
             author_id=self.author.pk,
+            target_comment_id=parent.pk,
             related_comment_id=parent.pk,
         )
 
         reply = service.create()
 
         self.assertEqual(reply.related_comment, parent)
+        self.assertEqual(reply.target_comment, parent)
         self.assertIn(reply, parent.replies.all())
 
-    def test_create_service_rejects_nonexistent_related_comment(self):
+    def test_create_service_keeps_reply_in_root_thread_and_targets_reply(self):
+        parent = Comment.objects.create(author=self.author, text="Parent comment")
+        first_reply = Comment.objects.create(
+            author=self.author,
+            text="First reply",
+            related_comment=parent,
+            target_comment=parent,
+        )
+        service = CommentCreateService(
+            text="Reply to first reply",
+            author_id=self.author.pk,
+            target_comment_id=first_reply.pk,
+            related_comment_id=parent.pk,
+        )
+
+        reply = service.create()
+
+        self.assertEqual(reply.related_comment, parent)
+        self.assertEqual(reply.target_comment, first_reply)
+        self.assertIn(reply, parent.replies.all())
+
+    def test_create_service_rejects_nonexistent_target_comment(self):
         service = CommentCreateService(
             text="Reply text",
             author_id=self.author.pk,
-            related_comment_id=999,
+            target_comment_id=999,
         )
 
         with self.assertRaises(ValidationError):
@@ -73,6 +97,39 @@ class CommentServiceTests(TestCase):
 
         self.assertIsNone(service.obj.pk)
         self.assertEqual(Comment.objects.count(), 0)
+
+    def test_create_service_rejects_related_comment_that_is_not_thread_root(self):
+        parent = Comment.objects.create(author=self.author, text="Parent comment")
+        target = Comment.objects.create(
+            author=self.author,
+            text="First reply",
+            related_comment=parent,
+            target_comment=parent,
+        )
+        service = CommentCreateService(
+            text="Invalid reply",
+            author_id=self.author.pk,
+            target_comment_id=target.pk,
+            related_comment_id=target.pk,
+        )
+
+        with self.assertRaises(ValidationError):
+            service.create()
+
+        self.assertEqual(Comment.objects.count(), 2)
+
+    def test_create_service_requires_related_comment_when_target_is_set(self):
+        target = Comment.objects.create(author=self.author, text="Target comment")
+        service = CommentCreateService(
+            text="Reply without thread root",
+            author_id=self.author.pk,
+            target_comment_id=target.pk,
+        )
+
+        with self.assertRaises(ValidationError):
+            service.create()
+
+        self.assertEqual(Comment.objects.count(), 1)
 
 
 class CommentQuerySetTests(TestCase):
@@ -89,6 +146,7 @@ class CommentQuerySetTests(TestCase):
             author=self.author,
             text="Reply",
             related_comment=self.main_comment,
+            target_comment=self.main_comment,
         )
         self.other_main_comment = Comment.objects.create(
             author=self.author,
@@ -155,16 +213,18 @@ class CommentCreateApiTests(TestCase):
             data={
                 "author": author.pk,
                 "text": "API comment",
-                "related_comment": None,
+                "target_comment": None,
             },
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(response.data["author"], author.pk)
+        self.assertIsNone(response.data["related_comment"])
+        self.assertIsNone(response.data["target_comment"])
         self.assertEqual(Comment.objects.get().text, "API comment")
 
-    def test_post_creates_reply_with_related_comment(self):
+    def test_post_creates_reply_to_main_comment(self):
         author = CommentAuthor.objects.create(
             username="replyuser",
             email="reply@example.com",
@@ -177,15 +237,91 @@ class CommentCreateApiTests(TestCase):
                 "author": author.pk,
                 "text": "Reply comment",
                 "related_comment": parent.pk,
+                "target_comment": parent.pk,
             },
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        self.assertEqual(
-            Comment.objects.get(pk=response.data["id"]).related_comment,
-            parent,
+        reply = Comment.objects.get(pk=response.data["id"])
+        self.assertEqual(reply.related_comment, parent)
+        self.assertEqual(reply.target_comment, parent)
+
+    def test_post_creates_reply_to_reply_in_the_same_parent_thread(self):
+        author = CommentAuthor.objects.create(
+            username="nested-reply-user",
+            email="nested-reply@example.com",
         )
+        parent = Comment.objects.create(author=author, text="Parent comment")
+        target = Comment.objects.create(
+            author=author,
+            text="First reply",
+            related_comment=parent,
+            target_comment=parent,
+        )
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "Reply to first reply",
+                "related_comment": parent.pk,
+                "target_comment": target.pk,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        reply = Comment.objects.get(pk=response.data["id"])
+        self.assertEqual(reply.related_comment, parent)
+        self.assertEqual(reply.target_comment, target)
+
+    def test_post_rejects_related_comment_that_is_not_target_thread_root(self):
+        author = CommentAuthor.objects.create(
+            username="invalid-thread-user",
+            email="invalid-thread@example.com",
+        )
+        parent = Comment.objects.create(author=author, text="Parent comment")
+        target = Comment.objects.create(
+            author=author,
+            text="First reply",
+            related_comment=parent,
+            target_comment=parent,
+        )
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "Invalid reply",
+                "related_comment": target.pk,
+                "target_comment": target.pk,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("related_comment", response.data)
+
+    def test_post_requires_related_comment_when_target_is_set(self):
+        author = CommentAuthor.objects.create(
+            username="missing-related-user",
+            email="missing-related@example.com",
+        )
+        target = Comment.objects.create(author=author, text="Target comment")
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "Reply without thread root",
+                "target_comment": target.pk,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("related_comment", response.data)
 
 
 class CommentRepliesApiTests(TestCase):
@@ -203,6 +339,7 @@ class CommentRepliesApiTests(TestCase):
         self.reply = Comment.objects.create(
             author=self.author,
             related_comment=self.comment,
+            target_comment=self.comment,
             text="Reply",
         )
         self.unrelated_comment = Comment.objects.create(
@@ -225,6 +362,7 @@ class CommentRepliesApiTests(TestCase):
                 {
                     "id": self.reply.pk,
                     "related_comment": self.comment.pk,
+                    "target_comment": self.comment.pk,
                     "text": "Reply",
                     "author": self.author.pk,
                 }
@@ -443,6 +581,27 @@ class CommentListViewTests(TestCase):
             len(response.context["comment_list"]),
         )
         self.assertContains(response, "Відповісти")
+
+    def test_reply_is_displayed_under_parent_and_identifies_its_target(self):
+        parent = Comment.objects.first()
+        target = Comment.objects.create(
+            author=self.author,
+            text="First reply",
+            related_comment=parent,
+            target_comment=parent,
+        )
+        reply = Comment.objects.create(
+            author=self.author,
+            text="Reply to first reply",
+            related_comment=parent,
+            target_comment=target,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'data-comment-id="{reply.pk}"')
+        self.assertContains(response, "У відповідь на коментар list-author")
 
     def test_comment_list_shows_remaining_comment_on_second_page(self):
         response = self.client.get("/", {"page": 2})

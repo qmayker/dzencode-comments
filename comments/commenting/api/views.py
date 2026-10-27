@@ -1,7 +1,7 @@
-from django.core.exceptions import ValidationError as DjangoValidationError
 from commenting.models import Comment
 from commenting.services.models.author.operations import get_or_create
 from commenting.services.models.comment.create import CommentCreateService
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
 from rest_framework.exceptions import ValidationError as APIValidationError
 from rest_framework.request import Request
@@ -46,6 +46,11 @@ class CommentCreateView(APIView):
             related_comment_id=(
                 serializer.validated_data["related_comment"].pk
                 if serializer.validated_data.get("related_comment")
+                else None
+            ),
+            target_comment_id=(
+                serializer.validated_data["target_comment"].pk
+                if serializer.validated_data.get("target_comment")
                 else None
             ),
         ).create()

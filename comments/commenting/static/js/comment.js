@@ -28,6 +28,7 @@ async function createComment({
   email,
   homePage,
   text,
+  targetCommentId = null,
   relatedCommentId = null,
 }) {
   const author = await postJson(authorUrl, {
@@ -39,6 +40,7 @@ async function createComment({
   return postJson(commentUrl, {
     author: author.id,
     text,
+    target_comment: targetCommentId,
     related_comment: relatedCommentId,
   });
 }
@@ -54,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  function attachSubmitHandler(form, getRelatedCommentId) {
+  function attachSubmitHandler(form, getReplyCommentIds) {
     const status = form.querySelector('[role="status"]');
 
     form.addEventListener("submit", async (event) => {
@@ -70,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
           email: formData.get("email"),
           homePage: formData.get("home_page"),
           text: formData.get("text"),
-          relatedCommentId: getRelatedCommentId(),
+          ...getReplyCommentIds(),
         });
         window.location.reload();
       } catch (error) {
@@ -79,20 +81,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  let targetCommentId = null;
   let relatedCommentId = null;
-  attachSubmitHandler(mainForm, () => null);
-  attachSubmitHandler(replyForm, () => relatedCommentId);
+  attachSubmitHandler(mainForm, () => ({
+    targetCommentId: null,
+    relatedCommentId: null,
+  }));
+  attachSubmitHandler(replyForm, () => ({
+    targetCommentId,
+    relatedCommentId,
+  }));
 
   document.querySelectorAll(".comment-reply-button").forEach((button) => {
     button.addEventListener("click", () => {
       const comment = button.closest(".comment");
       if (replySection.parentElement === comment) {
         replyStorage.append(replySection);
+        targetCommentId = null;
         relatedCommentId = null;
         return;
       }
 
-      relatedCommentId = button.dataset.commentId;
+      targetCommentId = button.dataset.commentId;
+      relatedCommentId = button.dataset.relatedCommentId;
       comment.append(replySection);
       replyForm.scrollIntoView({ behavior: "smooth", block: "center" });
       replyForm.querySelector('[name="text"]').focus();

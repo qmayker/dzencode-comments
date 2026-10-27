@@ -32,6 +32,9 @@ class Comment(TimeStampedModel):
     related_comment = models.ForeignKey(
         "self", null=True, blank=True, related_name="replies", on_delete=models.CASCADE
     )
+    target_comment = models.ForeignKey(
+        "self", null=True, blank=True, related_name="directed_replies", on_delete=models.CASCADE
+    )
     text = models.TextField(max_length=2000, validators=[CommentTextTagsValidator()])
 
     def __str__(self):

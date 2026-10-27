@@ -178,6 +178,20 @@ h1 {
   box-shadow: 0 3px 12px rgb(31 41 55 / 4%);
 }
 
+.comment-replies {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-left: 20px;
+  border-left: 2px solid #e3e7ef;
+}
+
+.comment-reply {
+  padding: 16px;
+  background: #f9fafc;
+  box-shadow: none;
+}
+
 .comment-header {
   display: flex;
   flex-wrap: wrap;
@@ -219,6 +233,12 @@ h1 {
 
 .comment-actions {
   margin-top: 12px;
+}
+
+.reply-target {
+  margin: -4px 0 8px;
+  color: #687386;
+  font-size: 0.85rem;
 }
 
 .comment-reply-button {

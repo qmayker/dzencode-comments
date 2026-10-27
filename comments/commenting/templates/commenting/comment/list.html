@@ -41,13 +41,8 @@
               <time class="comment-date" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"d.m.Y H:i" }}</time>
             </header>
             <div class="comment-body">{{ comment.text|safe }}</div>
-            <div class="comment-actions">
-              <button
-                class="comment-reply-button"
-                type="button"
-                data-comment-id="{{ comment.id }}"
-                data-comment-author="{{ comment.author.username }}"
-              >Відповісти</button>
+            {% include 'commenting/comment/reply_button.html' with id=comment.id username=comment.author.username comment_id=comment.id %}
+            <div class="comment-replies">
             </div>
           </article>
         {% empty %}
