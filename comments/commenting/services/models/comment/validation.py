@@ -18,8 +18,18 @@ class CommentValidation(BaseValidator[Comment]):
             raise ValidationError("Related and target comment IDs must both be set.")
 
         target_comment = self.obj.target_comment
-        expected_related_id = target_comment.related_comment_id or target_comment.pk
-        if related_id != expected_related_id:
+        if related_id == target_id:
+            if target_comment.related_comment_id is not None:
+                raise ValidationError(
+                    "A reply target must be a main comment in this case."
+                )
+            return
+
+        related_comment = self.obj.related_comment
+        if (
+            related_comment.related_comment_id is not None
+            or target_comment.related_comment_id != related_id
+        ):
             raise ValidationError(
-                "Related comment must be the root of the target comment thread."
+                "Target comment must be a reply under the related main comment."
             )
