@@ -160,10 +160,7 @@ function appendReplyToThread(reply) {
     return;
   }
 
-  const target = document.querySelector(
-    `.comment[data-comment-id="${reply.target_comment}"] .comment-author`,
-  );
-  const replyData = { ...reply, target_comment_username: target?.textContent };
+  const replyData = { ...reply, target_comment_username: reply.target_comment_username};
 
   let replies = document.getElementById(`comment-replies-${reply.related_comment}`);
   const viewButton = root.querySelector(".comment-view-replies-button");
@@ -226,22 +223,16 @@ document.addEventListener("DOMContentLoaded", () => {
           captchaHashkey,
           ...getReplyCommentIds(),
         });
-        // The API does not return these fields yet, so use the submitted values.
-        const createdComment = {
-          ...comment,
-          author_username: comment.author_username ?? formData.get("username"),
-          created_at: comment.created_at ?? new Date().toISOString(),
-        };
 
-        if (createdComment.related_comment) {
+        if (comment.related_comment) {
           if (form === replyForm) {
             replyStorage.append(replySection);
             targetCommentId = null;
             relatedCommentId = null;
           }
-          appendReplyToThread(createdComment);
+          appendReplyToThread(comment);
         } else {
-          appendCommentToList(createdComment);
+          appendCommentToList(comment);
         }
 
         form.reset();

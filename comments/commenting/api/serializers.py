@@ -1,4 +1,3 @@
-from captcha.serializers import CaptchaModelSerializer
 from commenting.models import Comment, CommentAuthor
 from commenting.validators import UserNameValidator
 from rest_framework import serializers
@@ -18,10 +17,24 @@ class AuthorGetCreateSerializer(ModelSerializer):
 
 class CommentCreateSerializer(ModelSerializer):
     id = serializers.IntegerField(read_only=True)
+    author_username = serializers.CharField(source="author.username", read_only=True)
+    target_comment_username = serializers.CharField(
+        source="target_comment.author.username",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Comment
-        fields = ["id", "related_comment", "target_comment", "text", "author"]
+        fields = [
+            "id",
+            "related_comment",
+            "target_comment",
+            "text",
+            "author",
+            "author_username",
+            "target_comment_username",
+        ]
 
     def validate(self, attrs):
         related_comment = attrs.get("related_comment")
