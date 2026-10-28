@@ -40,6 +40,28 @@ class CommentCreateSerializer(ModelSerializer):
         return attrs
 
 
+class CommentReplySerializer(ModelSerializer):
+    author_username = serializers.CharField(source="author.username", read_only=True)
+    target_comment_username = serializers.CharField(
+        source="target_comment.author.username",
+        read_only=True,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Comment
+        fields = [
+            "id",
+            "related_comment",
+            "target_comment",
+            "text",
+            "author",
+            "author_username",
+            "target_comment_username",
+            "created_at",
+        ]
+
+
 class CommentRepliesQuerySerializer(serializers.Serializer):
     comment_id = serializers.PrimaryKeyRelatedField(
         source="comment",

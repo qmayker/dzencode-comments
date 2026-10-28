@@ -356,18 +356,18 @@ class CommentRepliesApiTests(TestCase):
         response = self.client.get(self.url, {"comment_id": self.comment.pk})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], self.reply.pk)
+        self.assertEqual(response.data[0]["related_comment"], self.comment.pk)
+        self.assertEqual(response.data[0]["target_comment"], self.comment.pk)
+        self.assertEqual(response.data[0]["text"], "Reply")
+        self.assertEqual(response.data[0]["author"], self.author.pk)
+        self.assertEqual(response.data[0]["author_username"], self.author.username)
         self.assertEqual(
-            response.data,
-            [
-                {
-                    "id": self.reply.pk,
-                    "related_comment": self.comment.pk,
-                    "target_comment": self.comment.pk,
-                    "text": "Reply",
-                    "author": self.author.pk,
-                }
-            ],
+            response.data[0]["target_comment_username"],
+            self.author.username,
         )
+        self.assertTrue(response.data[0]["created_at"])
 
     def test_get_returns_bad_request_when_comment_id_is_missing(self):
         response = self.client.get(self.url)
@@ -581,8 +581,9 @@ class CommentListViewTests(TestCase):
             len(response.context["comment_list"]),
         )
         self.assertContains(response, "Відповісти")
+        self.assertNotContains(response, "Переглянути відповіді")
 
-    def test_reply_is_displayed_under_parent_and_identifies_its_target(self):
+    def test_replies_button_is_rendered_only_for_comments_with_replies(self):
         parent = Comment.objects.first()
         target = Comment.objects.create(
             author=self.author,
@@ -600,8 +601,12 @@ class CommentListViewTests(TestCase):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f'data-comment-id="{reply.pk}"')
-        self.assertContains(response, "У відповідь на коментар list-author")
+        self.assertContains(response, f'data-comment-id="{parent.pk}"')
+        self.assertContains(response, "class=\"comment-view-replies-button\"")
+        self.assertContains(response, "Переглянути відповіді (2)")
+        self.assertNotContains(response, "comment-replies-status")
+        self.assertNotContains(response, "Reply to first reply")
+        self.assertContains(response, "window.commentRepliesUrl")
 
     def test_comment_list_shows_remaining_comment_on_second_page(self):
         response = self.client.get("/", {"page": 2})

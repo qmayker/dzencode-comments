@@ -186,6 +186,10 @@ h1 {
   border-left: 2px solid #e3e7ef;
 }
 
+.comment-replies[hidden] {
+  display: none;
+}
+
 .comment-reply {
   padding: 16px;
   background: #f9fafc;
@@ -232,6 +236,9 @@ h1 {
 }
 
 .comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-top: 12px;
 }
 
@@ -254,6 +261,25 @@ h1 {
 
 .comment-reply-button:hover {
   text-decoration: underline;
+}
+
+.comment-view-replies-button {
+  padding: 0;
+  border: 0;
+  color: #4053ad;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.comment-view-replies-button:hover {
+  text-decoration: underline;
+}
+
+.comment-view-replies-button:disabled {
+  cursor: wait;
 }
 
 .empty-state {

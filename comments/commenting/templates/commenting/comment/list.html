@@ -35,16 +35,7 @@
 
       <section class="comment-list" aria-label="Список коментарів">
         {% for comment in comment_list %}
-          <article class="comment" data-comment-id="{{ comment.id }}">
-            <header class="comment-header">
-              <strong class="comment-author">{{ comment.author.username }}</strong>
-              <time class="comment-date" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"d.m.Y H:i" }}</time>
-            </header>
-            <div class="comment-body">{{ comment.text|safe }}</div>
-            {% include 'commenting/comment/reply_button.html' with id=comment.id username=comment.author.username comment_id=comment.id %}
-            <div class="comment-replies">
-            </div>
-          </article>
+          {% include 'commenting/comment/comment.html' %}
         {% empty %}
           <p class="empty-state">Коментарів поки немає.</p>
         {% endfor %}
@@ -68,6 +59,7 @@
     <script>
       window.authorGetCreateUrl = "{% url 'api:commenting:author-get-create' %}";
       window.commentCreateUrl = "{% url 'api:commenting:comment-create' %}";
+      window.commentRepliesUrl = "{% url 'api:commenting:comment-replies' %}";
     </script>
     <script src="{% static 'js/comment.js' %}"></script>
   </body>

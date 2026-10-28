@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from .serializers import (
     AuthorGetCreateSerializer,
     CommentCreateSerializer,
+    CommentReplySerializer,
     CommentRepliesQuerySerializer,
 )
 
@@ -66,8 +67,10 @@ class CommentRepliesView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        related_comments = CommentCreateSerializer(
-            Comment.objects.for_related_comment(serializer.validated_data["comment"]),
+        related_comments = CommentReplySerializer(
+            Comment.objects.for_related_comment(
+                serializer.validated_data["comment"]
+            ).select_related("author", "target_comment__author"),
             many=True,
         )
         return Response(related_comments.data, status=status.HTTP_200_OK)
