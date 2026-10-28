@@ -53,6 +53,7 @@ class CommentCreateView(CaptchaMixin, APIView):
         self.validate_captcha()
         serializer = CommentCreateSerializer(data=request.data)
         if not serializer.is_valid():
+            print(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         comment = CommentCreateService(
             text=serializer.validated_data["text"],
