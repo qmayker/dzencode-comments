@@ -4,6 +4,14 @@
     {% for field in form %}
       <div class="form-field{% if field.name == 'text' %} form-field-comment{% endif %}">
         {{ field.label_tag }}
+        {% if field.name == 'text' %}
+          <div class="tag-toolbar" role="toolbar" aria-label="Форматування коментаря">
+            <button type="button" data-tag="i" aria-label="Курсив">[i]</button>
+            <button type="button" data-tag="strong" aria-label="Жирний текст">[strong]</button>
+            <button type="button" data-tag="code" aria-label="Код">[code]</button>
+            <button type="button" data-tag="a" aria-label="Посилання">[a]</button>
+          </div>
+        {% endif %}
         {{ field }}
         {% for error in field.errors %}
           <p class="form-error">{{ error }}</p>

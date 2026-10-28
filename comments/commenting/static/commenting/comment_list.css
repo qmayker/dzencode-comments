@@ -78,6 +78,29 @@ h1 {
   font-weight: 600;
 }
 
+.tag-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.comment-create form .tag-toolbar button {
+  width: auto;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 1px solid #d8deea;
+  color: #4053ad;
+  background: #f7f8ff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comment-create form .tag-toolbar button:hover {
+  border-color: #5265c4;
+  background: #eef0ff;
+}
+
 .form-field input,
 .form-field textarea,
 .comment-create form button {

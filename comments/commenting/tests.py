@@ -553,6 +553,15 @@ class CommentListViewTests(TestCase):
         )
         self.assertIn('id="reply_username"', content)
 
+    def test_comment_forms_include_html_tag_toolbar(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        for tag in ("i", "strong", "code", "a"):
+            self.assertEqual(content.count(f'data-tag="{tag}"'), 2)
+        self.assertContains(response, "js/tags.js")
+
     def test_forms_do_not_include_a_relation_input(self):
         response = self.client.get("/")
 
