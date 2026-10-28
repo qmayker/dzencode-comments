@@ -28,6 +28,8 @@ async function createComment({
   email,
   homePage,
   text,
+  captchaCode,
+  captchaHashkey,
   targetCommentId = null,
   relatedCommentId = null,
 }) {
@@ -42,6 +44,8 @@ async function createComment({
     text,
     target_comment: targetCommentId,
     related_comment: relatedCommentId,
+    captcha_code: captchaCode,
+    captcha_hashkey: captchaHashkey,
   });
 }
 
@@ -82,6 +86,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const formData = new FormData(form);
       try {
+        const captchaCode = formData.get("captcha_1");
+        const captchaHashkey = formData.get("captcha_0");
+        if (!captchaCode || !captchaHashkey) {
+          throw new Error("Введіть код CAPTCHA.");
+        }
+
         await createComment({
           authorUrl: window.authorGetCreateUrl,
           commentUrl: window.commentCreateUrl,
@@ -89,6 +99,8 @@ document.addEventListener("DOMContentLoaded", () => {
           email: formData.get("email"),
           homePage: formData.get("home_page"),
           text: formData.get("text"),
+          captchaCode,
+          captchaHashkey,
           ...getReplyCommentIds(),
         });
         window.location.reload();

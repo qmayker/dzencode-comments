@@ -175,6 +175,15 @@ class CommentQuerySetTests(TestCase):
 class CommentCreateApiTests(TestCase):
     url = "/api/commenting/comments/"
 
+    def captcha_payload(self):
+        from captcha.models import CaptchaStore
+
+        hashkey = CaptchaStore.generate_key()
+        return {
+            "captcha_code": CaptchaStore.objects.get(hashkey=hashkey).response,
+            "captcha_hashkey": hashkey,
+        }
+
     def test_author_response_can_be_used_to_create_comment(self):
         author_response = self.client.post(
             "/api/commenting/authors/",
@@ -195,6 +204,7 @@ class CommentCreateApiTests(TestCase):
             data={
                 "author": author_response.data["id"],
                 "text": "Created through the API flow",
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -214,6 +224,7 @@ class CommentCreateApiTests(TestCase):
                 "author": author.pk,
                 "text": "API comment",
                 "target_comment": None,
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -238,6 +249,7 @@ class CommentCreateApiTests(TestCase):
                 "text": "Reply comment",
                 "related_comment": parent.pk,
                 "target_comment": parent.pk,
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -267,6 +279,7 @@ class CommentCreateApiTests(TestCase):
                 "text": "Reply to first reply",
                 "related_comment": parent.pk,
                 "target_comment": target.pk,
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -296,6 +309,7 @@ class CommentCreateApiTests(TestCase):
                 "text": "Invalid reply",
                 "related_comment": target.pk,
                 "target_comment": target.pk,
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -316,6 +330,7 @@ class CommentCreateApiTests(TestCase):
                 "author": author.pk,
                 "text": "Reply without thread root",
                 "target_comment": target.pk,
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -552,6 +567,24 @@ class CommentListViewTests(TestCase):
             content,
         )
         self.assertIn('id="reply_username"', content)
+
+    def test_comment_forms_include_captcha_fields(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertEqual(content.count('name="captcha_0"'), 2)
+        self.assertEqual(content.count('name="captcha_1"'), 2)
+        self.assertEqual(content.count('class="js-captcha-refresh"'), 2)
+        self.assertContains(response, "js/captcha.js")
+
+        refresh_response = self.client.get(
+            "/captcha/refresh/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(refresh_response.status_code, 200)
+        self.assertIn("image_url", refresh_response.json())
+        self.assertIn("key", refresh_response.json())
 
     def test_comment_forms_include_html_tag_toolbar(self):
         response = self.client.get("/")

@@ -23,4 +23,5 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("api.urls", namespace="api")),
     path("", CommentListView.as_view(), name="comment-list"),
+    path("captcha/", include("captcha.urls")),
 ]

@@ -101,6 +101,20 @@ h1 {
   background: #eef0ff;
 }
 
+.comment-create form .js-captcha-refresh {
+  width: fit-content;
+  min-height: 34px;
+  padding: 4px 10px;
+  color: #4053ad;
+  background: #f7f8ff;
+  cursor: pointer;
+}
+
+.comment-create form .js-captcha-refresh:hover {
+  border-color: #5265c4;
+  background: #eef0ff;
+}
+
 .form-field input,
 .form-field textarea,
 .comment-create form button {

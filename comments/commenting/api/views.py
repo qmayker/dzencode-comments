@@ -1,3 +1,4 @@
+from captcha.serializers import CaptchaSerializer
 from commenting.models import Comment
 from commenting.services.models.author.operations import get_or_create
 from commenting.services.models.comment.create import CommentCreateService
@@ -11,13 +12,24 @@ from rest_framework.views import APIView
 from .serializers import (
     AuthorGetCreateSerializer,
     CommentCreateSerializer,
-    CommentReplySerializer,
     CommentRepliesQuerySerializer,
+    CommentReplySerializer,
 )
 
 
-class AuthorGetCreateView(APIView):
+class CaptchaMixin:
+    request: Request
+
+    def validate_captcha(self):
+        data = self.request.POST
+        serializer = CaptchaSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AuthorGetCreateView(CaptchaMixin, APIView):
     def post(self, request: Request) -> Response:
+        self.validate_captcha()
         serializer = AuthorGetCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -36,8 +48,9 @@ class AuthorGetCreateView(APIView):
         )
 
 
-class CommentCreateView(APIView):
+class CommentCreateView(CaptchaMixin, APIView):
     def post(self, request: Request) -> Response:
+        self.validate_captcha()
         serializer = CommentCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

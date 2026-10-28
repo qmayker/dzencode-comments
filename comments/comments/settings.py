@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "commenting.apps.CommentingConfig",
     "rest_framework",
+    "captcha",
 ]
 
 MIDDLEWARE = [
@@ -127,3 +128,8 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+# Captcha
+
+CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.random_char_challenge"
+CAPTCHA_LENGTH = 6

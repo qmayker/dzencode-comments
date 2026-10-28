@@ -1,7 +1,9 @@
+from captcha.fields import CaptchaField
 from django import forms
 
 
 class CommentCreateForm(forms.Form):
+    captcha = CaptchaField()
     username = forms.CharField(
         label="Ім'я",
         max_length=100,

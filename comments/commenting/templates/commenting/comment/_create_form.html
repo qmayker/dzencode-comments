@@ -13,6 +13,9 @@
           </div>
         {% endif %}
         {{ field }}
+        {% if field.name == 'captcha' %}
+          <button type="button" class="js-captcha-refresh">Оновити CAPTCHA</button>
+        {% endif %}
         {% for error in field.errors %}
           <p class="form-error">{{ error }}</p>
         {% endfor %}

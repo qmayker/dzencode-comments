@@ -1,3 +1,4 @@
+from captcha.serializers import CaptchaModelSerializer
 from commenting.models import Comment, CommentAuthor
 from commenting.validators import UserNameValidator
 from rest_framework import serializers
