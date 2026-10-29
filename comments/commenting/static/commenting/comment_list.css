@@ -127,6 +127,31 @@ h1 {
   font: inherit;
 }
 
+.form-field input[type="file"] {
+  min-height: 48px;
+  padding: 6px;
+  border-style: dashed;
+  background: #f9fafc;
+  cursor: pointer;
+}
+
+.form-field input[type="file"]::file-selector-button {
+  min-height: 34px;
+  margin-right: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: #5265c4;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-field input[type="file"]::file-selector-button:hover {
+  background: #4053ad;
+}
+
 .form-field textarea {
   resize: vertical;
 }
@@ -263,6 +288,15 @@ h1 {
   color: #4053ad;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
+}
+
+.comment-attachment {
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.comment-attachment a {
+  color: #4053ad;
 }
 
 .comment-body code {

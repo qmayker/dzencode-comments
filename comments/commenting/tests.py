@@ -1,7 +1,14 @@
+from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from PIL import Image
 from rest_framework import status
 
+from commenting.enums import FileTypeEnum
 from commenting.models import Comment, CommentAuthor
 from commenting.services.models.author.create import (
     CommentAuthorService,
@@ -12,6 +19,87 @@ from commenting.services.models.comment.create import (
     CommentCreateService,
     CommentService,
 )
+from commenting.services.models.comment.validation import CommentValidation
+from commenting.validators import FileFormatData
+
+
+def create_png_upload(filename):
+    image_data = BytesIO()
+    Image.new("RGB", (1, 1)).save(image_data, format="PNG")
+    return SimpleUploadedFile(filename, image_data.getvalue(), content_type="image/png")
+
+
+class CommentFileValidationTests(TestCase):
+    def test_accepts_configured_image_extensions_case_insensitively(self):
+        for filename in ("image.jpg", "image.GIF", "image.PnG"):
+            with self.subTest(filename=filename):
+                comment = Comment(additional_file=create_png_upload(filename))
+                CommentValidation(comment).validate_file()
+
+    def test_file_formats_default_to_txt(self):
+        formats = FileFormatData(
+            all_formats=set(),
+            image_formats=set(),
+            file_formats={"txt"},
+        )
+
+        self.assertEqual(formats.file_formats, {"txt"})
+
+    def test_get_all_formats_uses_default_file_formats(self):
+        formats = FileFormatData.get_all_formats()
+
+        self.assertEqual(formats.file_formats, {"txt"})
+        self.assertEqual(
+            formats.all_formats,
+            formats.image_formats | formats.file_formats,
+        )
+
+    def test_comment_get_suffix_sets_image_file_type(self):
+        comment = Comment(additional_file=create_png_upload("IMAGE.PNG"))
+
+        self.assertEqual(comment.get_suffix(), "png")
+        self.assertEqual(comment.file_type, FileTypeEnum.IMG)
+
+    def test_comment_get_suffix_sets_text_file_type(self):
+        comment = Comment(additional_file=SimpleUploadedFile("notes.TXT", b"notes"))
+
+        self.assertEqual(comment.get_suffix(), "txt")
+        self.assertEqual(comment.file_type, FileTypeEnum.TXT)
+
+    def test_comment_get_suffix_clears_file_type_when_file_is_missing(self):
+        comment = Comment(file_type=FileTypeEnum.IMG)
+
+        self.assertIsNone(comment.get_suffix())
+        self.assertIsNone(comment.file_type)
+
+    def test_comment_form_file_input_accepts_all_supported_formats(self):
+        from commenting.forms import CommentCreateForm
+
+        accept = CommentCreateForm().fields["additional_file"].widget.attrs["accept"]
+
+        self.assertEqual(accept, ".gif,.jpg,.png,.txt")
+
+    def test_rejects_extensions_not_in_image_formats_or_txt(self):
+        with self.assertRaises(ValidationError):
+            CommentValidation(
+                Comment(additional_file=SimpleUploadedFile("document.pdf", b"document"))
+            ).validate_file()
+
+    def test_accepts_txt_files_within_size_limit(self):
+        CommentValidation(
+            Comment(additional_file=SimpleUploadedFile("document.txt", b"text"))
+        ).validate_file()
+
+    def test_rejects_txt_files_over_size_limit(self):
+        oversized_file = SimpleUploadedFile(
+            "document.txt",
+            b"x" * (100 * 1024 + 1),
+        )
+
+        with self.assertRaises(ValidationError):
+            CommentValidation(
+                Comment(additional_file=oversized_file)
+            ).validate_file()
 
 
 class CommentServiceTests(TestCase):
@@ -234,6 +322,36 @@ class CommentCreateApiTests(TestCase):
         self.assertIsNone(response.data["related_comment"])
         self.assertIsNone(response.data["target_comment"])
         self.assertEqual(Comment.objects.get().text, "API comment")
+
+    def test_post_saves_uploaded_file_under_configured_upload_path(self):
+        author = CommentAuthor.objects.create(
+            username="file-upload-user",
+            email="file-upload@example.com",
+        )
+
+        with TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                response = self.client.post(
+                    self.url,
+                    data={
+                        "author": author.pk,
+                        "text": "Comment with attachment",
+                        "additional_file": create_png_upload("attachment.png"),
+                        **self.captcha_payload(),
+                    },
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_201_CREATED,
+                    response.data,
+                )
+                comment = Comment.objects.get(pk=response.data["id"])
+                self.assertTrue(response.data["additional_file"].startswith("/media/"))
+                self.assertTrue(comment.additional_file.name.startswith("comments/"))
+                self.assertTrue(
+                    Path(media_root, comment.additional_file.name).is_file()
+                )
 
     def test_post_creates_reply_to_main_comment(self):
         author = CommentAuthor.objects.create(
@@ -644,7 +762,7 @@ class CommentListViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'data-comment-id="{parent.pk}"')
-        self.assertContains(response, "class=\"comment-view-replies-button\"")
+        self.assertContains(response, 'class="comment-view-replies-button"')
         self.assertContains(response, "Переглянути відповіді (2)")
         self.assertNotContains(response, "comment-replies-status")
         self.assertNotContains(response, "Reply to first reply")

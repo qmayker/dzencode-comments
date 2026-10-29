@@ -1,11 +1,16 @@
 async function postJson(url, data) {
+    const isFormData = data instanceof FormData;
+    const headers = {
+        "X-CSRFToken": Cookies.get("csrftoken")
+    };
+    if (!isFormData) {
+        headers["Content-Type"] = "application/json";
+    }
+
     const response = await fetch(url, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": Cookies.get("csrftoken")
-        },
-        body: JSON.stringify(data),
+        headers,
+        body: isFormData ? data : JSON.stringify(data),
     });
     // console.log("Status:", response.status);
     // console.log("Response:", await response.text());
@@ -30,6 +35,7 @@ async function createComment({
   text,
   captchaCode,
   captchaHashkey,
+  additionalFile,
   targetCommentId = null,
   relatedCommentId = null,
 }) {
@@ -39,14 +45,22 @@ async function createComment({
     home_page: homePage || null,
   });
 
-  return postJson(commentUrl, {
-    author: author.id,
-    text,
-    target_comment: targetCommentId,
-    related_comment: relatedCommentId,
-    captcha_code: captchaCode,
-    captcha_hashkey: captchaHashkey,
-  });
+  const commentData = new FormData();
+  commentData.set("author", author.id);
+  commentData.set("text", text);
+  commentData.set("captcha_0", captchaHashkey);
+  commentData.set("captcha_1", captchaCode);
+  if (targetCommentId) {
+    commentData.set("target_comment", targetCommentId);
+  }
+  if (relatedCommentId) {
+    commentData.set("related_comment", relatedCommentId);
+  }
+  if (additionalFile?.size) {
+    commentData.set("additional_file", additionalFile);
+  }
+
+  return postJson(commentUrl, commentData);
 }
 
 window.createComment = createComment;
@@ -112,6 +126,16 @@ function buildCommentElement(comment, { isReply }) {
   body.className = "comment-body";
   body.innerHTML = comment.text;
   article.append(body);
+
+  if (comment.additional_file) {
+    const attachment = document.createElement("p");
+    attachment.className = "comment-attachment";
+    const link = document.createElement("a");
+    link.href = comment.additional_file;
+    link.textContent = "Завантажений файл";
+    attachment.append(link);
+    article.append(attachment);
+  }
 
   const actions = document.createElement("div");
   actions.className = "comment-actions";
@@ -221,6 +245,7 @@ document.addEventListener("DOMContentLoaded", () => {
           text: formData.get("text"),
           captchaCode,
           captchaHashkey,
+          additionalFile: formData.get("additional_file"),
           ...getReplyCommentIds(),
         });
 

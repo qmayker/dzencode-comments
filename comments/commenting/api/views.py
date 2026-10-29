@@ -68,6 +68,7 @@ class CommentCreateView(CaptchaMixin, APIView):
                 if serializer.validated_data.get("target_comment")
                 else None
             ),
+            additional_file=serializer.validated_data.get("additional_file"),
         ).create()
         return Response(
             CommentCreateSerializer(comment).data,

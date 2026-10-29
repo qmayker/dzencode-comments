@@ -1,9 +1,25 @@
 from captcha.fields import CaptchaField
 from django import forms
 
+from commenting.validators import FileFormatData
+
 
 class CommentCreateForm(forms.Form):
     captcha = CaptchaField()
+    additional_file = forms.FileField(
+        label="Файл (необов'язково)",
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                "accept": ",".join(
+                    f".{extension}"
+                    for extension in sorted(
+                        FileFormatData.get_all_formats().all_formats
+                    )
+                )
+            }
+        ),
+    )
     username = forms.CharField(
         label="Ім'я",
         max_length=100,

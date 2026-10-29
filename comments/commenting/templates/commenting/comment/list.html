@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Коментарі</title>
     <link rel="stylesheet" href="{% static 'commenting/comment_list.css' %}">
+    <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.12.0/css/lightbox.min.css"
+    >
   </head>
   <body>
     <main class="page">
@@ -61,6 +65,7 @@
       window.commentCreateUrl = "{% url 'api:commenting:comment-create' %}";
       window.commentRepliesUrl = "{% url 'api:commenting:comment-replies' %}";
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.12.0/js/lightbox-plus-jquery.min.js"></script>
     <script src="{% static 'js/tags.js' %}"></script>
     <script src="{% static 'js/captcha.js' %}"></script>
     <script src="{% static 'js/comment.js' %}"></script>

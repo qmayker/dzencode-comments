@@ -4,6 +4,11 @@
         <time class="comment-date" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"d.m.Y H:i" }}</time>
     </header>
     <div class="comment-body">{{ comment.text|safe }}</div>
+    {% if comment.file_type == file_type_enum.IMG %}
+        <a href="{{ comment.additional_file.url }}" data-lightbox="comments">
+            <img src="{{ comment.additional_file.url }}" alt="Зображення коментаря">
+        </a>
+    {% endif %}
     <div class="comment-actions">
         {% include 'commenting/comment/reply_button.html' with id=comment.id username=comment.author.username comment_id=comment.id %}
         {% if comment.replies.all %}

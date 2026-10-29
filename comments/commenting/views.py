@@ -6,6 +6,8 @@ from django.views.generic import ListView
 from commenting.forms import CommentCreateForm
 from commenting.models import Comment
 
+from .enums import FileTypeEnum
+
 
 class OrderingType(StrEnum):
     ASC = "asc"
@@ -40,9 +42,14 @@ class CommentListView(ListView):
         return selected_ordering.build_ordering_name(ordering_field)
 
     def get_queryset(self) -> QuerySet[Comment]:
-        return super().get_queryset().main_comments().prefetch_related(
-            "replies__author",
-            "replies__target_comment__author",
+        return (
+            super()
+            .get_queryset()
+            .main_comments()
+            .prefetch_related(
+                "replies__author",
+                "replies__target_comment__author",
+            )
         )
 
     def get_ordering(self):
@@ -57,4 +64,5 @@ class CommentListView(ListView):
         context = super().get_context_data(**kwargs)
         context["comment_form"] = CommentCreateForm()
         context["comment_reply_form"] = CommentCreateForm(auto_id="reply_%s")
+        context["file_type_enum"] = FileTypeEnum
         return context

@@ -119,6 +119,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
@@ -133,3 +136,10 @@ MAILERS = {
 
 CAPTCHA_CHALLENGE_FUNCT = "captcha.helpers.random_char_challenge"
 CAPTCHA_LENGTH = 6
+
+
+# Files
+
+
+TXT_FILE_SIZE = 1  # Кілобайти
+IMAGE_FORMATS = ["jpg", "gif", "png"]
