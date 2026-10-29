@@ -347,11 +347,31 @@ class CommentCreateApiTests(TestCase):
                     response.data,
                 )
                 comment = Comment.objects.get(pk=response.data["id"])
+                self.assertEqual(response.data["file_type"], FileTypeEnum.IMG)
                 self.assertTrue(response.data["additional_file"].startswith("/media/"))
                 self.assertTrue(comment.additional_file.name.startswith("comments/"))
                 self.assertTrue(
                     Path(media_root, comment.additional_file.name).is_file()
                 )
+
+    def test_post_returns_text_file_type_for_uploaded_text_file(self):
+        author = CommentAuthor.objects.create(
+            username="text-file-upload-user",
+            email="text-file-upload@example.com",
+        )
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "Comment with text attachment",
+                "additional_file": SimpleUploadedFile("notes.txt", b"Notes"),
+                **self.captcha_payload(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["file_type"], FileTypeEnum.TXT)
 
     def test_post_creates_reply_to_main_comment(self):
         author = CommentAuthor.objects.create(
@@ -712,6 +732,13 @@ class CommentListViewTests(TestCase):
         for tag in ("i", "strong", "code", "a"):
             self.assertEqual(content.count(f'data-tag="{tag}"'), 2)
         self.assertContains(response, "js/tags.js")
+
+    def test_text_file_dialog_is_available_for_comment_attachments(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="text-file-dialog"')
+        self.assertContains(response, "js/txt.js")
 
     def test_forms_do_not_include_a_relation_input(self):
         response = self.client.get("/")

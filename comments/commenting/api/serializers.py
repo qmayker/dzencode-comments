@@ -33,6 +33,7 @@ class CommentCreateSerializer(ModelSerializer):
             "text",
             "author",
             "additional_file",
+            "file_type",
             "author_username",
             "target_comment_username",
         ]
@@ -72,6 +73,7 @@ class CommentReplySerializer(ModelSerializer):
             "text",
             "author",
             "additional_file",
+            "file_type",
             "author_username",
             "target_comment_username",
             "created_at",

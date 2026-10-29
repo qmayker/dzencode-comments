@@ -127,12 +127,22 @@ function buildCommentElement(comment, { isReply }) {
   body.innerHTML = comment.text;
   article.append(body);
 
-  if (comment.additional_file) {
+  if (comment.additional_file && comment.file_type === "text") {
+    const attachment = document.createElement("p");
+    attachment.className = "comment-attachment";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "js-open-text-file";
+    button.dataset.fileUrl = comment.additional_file;
+    button.textContent = "Відкрити текстовий файл";
+    attachment.append(button);
+    article.append(attachment);
+  } else if (comment.additional_file && comment.file_type === "image") {
     const attachment = document.createElement("p");
     attachment.className = "comment-attachment";
     const link = document.createElement("a");
     link.href = comment.additional_file;
-    link.textContent = "Завантажений файл";
+    link.textContent = "Завантажене зображення";
     attachment.append(link);
     article.append(attachment);
   }

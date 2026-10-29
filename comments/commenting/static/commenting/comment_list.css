@@ -299,6 +299,132 @@ h1 {
   color: #4053ad;
 }
 
+.comment-attachment button {
+  padding: 0;
+  border: 0;
+  color: #4053ad;
+  background: transparent;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.text-file-dialog {
+  width: min(720px, calc(100% - 32px));
+  max-width: none;
+  max-height: min(80vh, 720px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e3e7ef;
+  border-radius: 14px;
+  color: #1f2937;
+  background: #fff;
+  box-shadow: 0 20px 60px rgb(17 24 39 / 24%);
+}
+
+.text-file-dialog[open] {
+  animation: text-dialog-enter 180ms ease-out;
+}
+
+.text-file-dialog.is-closing {
+  animation: text-dialog-exit 180ms ease-in forwards;
+}
+
+.text-file-dialog::backdrop {
+  background: rgb(17 24 39 / 0%);
+  transition: background 180ms ease-out;
+}
+
+.text-file-dialog[open]::backdrop {
+  background: rgb(17 24 39 / 55%);
+}
+
+.text-file-dialog.is-closing::backdrop {
+  background: rgb(17 24 39 / 0%);
+}
+
+.text-file-dialog-content {
+  display: grid;
+  max-height: inherit;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 20px;
+}
+
+.text-file-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.text-file-dialog-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.text-file-dialog-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  color: #4b5563;
+  background: #f3f5f8;
+  font: inherit;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.text-file-dialog-status {
+  margin: 0;
+  color: #687386;
+}
+
+.text-file-dialog-body {
+  min-height: 100px;
+  max-height: 60vh;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #f3f5f8;
+  font: 0.9rem/1.6 Consolas, "Courier New", monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@keyframes text-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes text-dialog-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-file-dialog[open],
+  .text-file-dialog.is-closing,
+  .text-file-dialog::backdrop {
+    animation: none;
+    transition: none;
+  }
+}
+
 .comment-body code {
   padding: 2px 5px;
   border-radius: 5px;

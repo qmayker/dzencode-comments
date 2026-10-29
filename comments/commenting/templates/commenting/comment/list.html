@@ -45,6 +45,17 @@
         {% endfor %}
       </section>
 
+      <dialog class="text-file-dialog" id="text-file-dialog" aria-labelledby="text-file-title">
+        <div class="text-file-dialog-content">
+          <header class="text-file-dialog-header">
+            <h2 id="text-file-title">Текстовий файл</h2>
+            <button type="button" class="text-file-dialog-close" aria-label="Закрити">×</button>
+          </header>
+          <p class="text-file-dialog-status" role="status" aria-live="polite"></p>
+          <pre class="text-file-dialog-body"></pre>
+        </div>
+      </dialog>
+
       {% if is_paginated %}
         <nav class="pagination" aria-label="Сторінки коментарів">
           {% if page_obj.has_previous %}
@@ -68,6 +79,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.12.0/js/lightbox-plus-jquery.min.js"></script>
     <script src="{% static 'js/tags.js' %}"></script>
     <script src="{% static 'js/captcha.js' %}"></script>
+    <script src="{% static 'js/txt.js' %}"></script>
     <script src="{% static 'js/comment.js' %}"></script>
   </body>
 </html>

@@ -8,6 +8,10 @@
         <a href="{{ comment.additional_file.url }}" data-lightbox="comments">
             <img src="{{ comment.additional_file.url }}" alt="Зображення коментаря">
         </a>
+    {% elif comment.file_type == file_type_enum.TXT %}
+        <p class="comment-attachment">
+            <button type="button" class="js-open-text-file" data-file-url="{{ comment.additional_file.url }}">Відкрити текстовий файл</button>
+        </p>
     {% endif %}
     <div class="comment-actions">
         {% include 'commenting/comment/reply_button.html' with id=comment.id username=comment.author.username comment_id=comment.id %}
