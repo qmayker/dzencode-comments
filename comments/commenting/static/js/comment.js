@@ -142,7 +142,12 @@ function buildCommentElement(comment, { isReply }) {
     attachment.className = "comment-attachment";
     const link = document.createElement("a");
     link.href = comment.additional_file;
-    link.textContent = "Завантажене зображення";
+    link.dataset.lightbox = "comments";
+    const image = document.createElement("img");
+    image.src = comment.additional_file;
+    image.alt = "Зображення коментаря";
+    image.loading = "lazy";
+    link.append(image);
     attachment.append(link);
     article.append(attachment);
   }
@@ -177,6 +182,51 @@ function renderReply(reply) {
 window.renderComment = renderComment;
 window.renderReply = renderReply;
 
+function updateRepliesButtonLabel(button, expanded) {
+  const count = button.dataset.replyCount;
+  button.textContent = expanded
+    ? `Сховати відповіді (${count})`
+    : `Переглянути відповіді (${count})`;
+}
+
+function bindRepliesButton(button) {
+  button.addEventListener("click", async () => {
+    const replies = document.getElementById(
+      `comment-replies-${button.dataset.commentId}`,
+    );
+    if (!replies) {
+      return;
+    }
+
+    if (replies.dataset.loaded === "true") {
+      replies.hidden = !replies.hidden;
+      button.setAttribute("aria-expanded", String(!replies.hidden));
+      updateRepliesButtonLabel(button, !replies.hidden);
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Завантаження відповідей...";
+    try {
+      const replyData = await getCommentReplies(
+        window.commentRepliesUrl,
+        button.dataset.commentId,
+      );
+      replyData.forEach((reply) => {
+        replies.append(renderReply(reply));
+      });
+      replies.dataset.loaded = "true";
+      replies.hidden = false;
+      button.setAttribute("aria-expanded", "true");
+      updateRepliesButtonLabel(button, true);
+    } catch (error) {
+      button.textContent = `Помилка: ${error.message}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 function appendCommentToList(comment) {
   const list = document.querySelector(".comment-list");
   if (!list) {
@@ -197,13 +247,30 @@ function appendReplyToThread(reply) {
   const replyData = { ...reply, target_comment_username: reply.target_comment_username};
 
   let replies = document.getElementById(`comment-replies-${reply.related_comment}`);
-  const viewButton = root.querySelector(".comment-view-replies-button");
+  let viewButton = root.querySelector(".comment-view-replies-button");
+
+  if (!viewButton) {
+    viewButton = document.createElement("button");
+    viewButton.className = "comment-view-replies-button";
+    viewButton.type = "button";
+    viewButton.dataset.commentId = reply.related_comment;
+    viewButton.dataset.replyCount = "0";
+    viewButton.setAttribute("aria-expanded", "false");
+    viewButton.setAttribute(
+      "aria-controls",
+      `comment-replies-${reply.related_comment}`,
+    );
+    viewButton.setAttribute("aria-live", "polite");
+    root.querySelector(":scope > .comment-actions").append(viewButton);
+    bindRepliesButton(viewButton);
+  }
+
+  const count = Number(viewButton.dataset.replyCount) + 1;
+  viewButton.dataset.replyCount = String(count);
 
   // Replies that were not loaded yet will come from the server on first expand.
-  if (replies && viewButton && replies.dataset.loaded !== "true") {
-    const count = Number(viewButton.dataset.replyCount) + 1;
-    viewButton.dataset.replyCount = String(count);
-    viewButton.textContent = `Переглянути відповіді (${count})`;
+  if (replies && replies.dataset.loaded !== "true") {
+    updateRepliesButtonLabel(viewButton, false);
     return;
   }
 
@@ -216,10 +283,8 @@ function appendReplyToThread(reply) {
   }
   replies.append(renderReply(replyData));
   replies.hidden = false;
-  if (viewButton) {
-    viewButton.setAttribute("aria-expanded", "true");
-    viewButton.textContent = "Сховати відповіді";
-  }
+  viewButton.setAttribute("aria-expanded", "true");
+  updateRepliesButtonLabel(viewButton, true);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -314,39 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
     replyForm.querySelector('[name="text"]').focus();
   });
 
-  document.querySelectorAll(".comment-view-replies-button").forEach((button) => {
-    const replies = document.getElementById(
-      `comment-replies-${button.dataset.commentId}`,
-    );
-    button.addEventListener("click", async () => {
-      if (replies.dataset.loaded === "true") {
-        replies.hidden = !replies.hidden;
-        button.setAttribute("aria-expanded", String(!replies.hidden));
-        button.textContent = replies.hidden
-          ? `Переглянути відповіді (${button.dataset.replyCount})`
-          : "Сховати відповіді";
-        return;
-      }
-
-      button.disabled = true;
-      button.textContent = "Завантаження відповідей...";
-      try {
-        const replyData = await getCommentReplies(
-          window.commentRepliesUrl,
-          button.dataset.commentId,
-        );
-        replyData.forEach((reply) => {
-          replies.append(renderReply(reply));
-        });
-        replies.dataset.loaded = "true";
-        replies.hidden = false;
-        button.setAttribute("aria-expanded", "true");
-        button.textContent = "Сховати відповіді";
-      } catch (error) {
-        button.textContent = `Помилка: ${error.message}`;
-      } finally {
-        button.disabled = false;
-      }
-    });
-  });
+  document
+    .querySelectorAll(".comment-view-replies-button")
+    .forEach(bindRepliesButton);
 });

@@ -299,6 +299,13 @@ h1 {
   color: #4053ad;
 }
 
+.comment-attachment img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
 .comment-attachment button {
   padding: 0;
   border: 0;
