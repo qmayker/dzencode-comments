@@ -47,7 +47,6 @@ class CommentValidation(BaseValidator[Comment]):
             return
         if related_id is None or target_id is None:
             raise ValidationError("Related and target comment IDs must both be set.")
-
         target_comment = self.obj.target_comment
         if related_id == target_id:
             if target_comment.related_comment_id is not None:

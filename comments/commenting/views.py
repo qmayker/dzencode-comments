@@ -1,10 +1,13 @@
 from enum import StrEnum
 
+from django.core.cache import cache
 from django.db.models import QuerySet
 from django.views.generic import ListView
 
 from commenting.forms import CommentCreateForm
 from commenting.models import Comment
+from commenting.services.models.comment.cache import CommentListCacheData
+from core.cache import CacheService
 
 from .enums import FileTypeEnum
 
@@ -24,6 +27,7 @@ class OrderingType(StrEnum):
 class CommentListView(ListView):
     model = Comment
     template_name = "commenting/comment/list.html"
+    context_object_name = "comment_list"
     paginate_by = 25
     ordering_fields = {
         "username": "author__username",
@@ -51,6 +55,31 @@ class CommentListView(ListView):
                 "replies__target_comment__author",
             )
         )
+
+    def paginate_queryset(self, queryset: QuerySet[Comment], page_size: int):
+        pagination = super().paginate_queryset(queryset, page_size)
+        if pagination is None:
+            return None
+
+        paginator, page, object_list, is_paginated = pagination
+        ordering = self.get_ordering()
+        cache_data = CommentListCacheData(
+            kwargs={
+                "version": str(cache.get(CommentListCacheData.version_key, 0)),
+                "ordering": ",".join(ordering) if ordering else "default",
+                "page": str(page.number),
+            }
+        )
+        cache_service: CacheService[list[Comment]] = CacheService(cache_data)
+        cached_comments = cache_service.get_value()
+        if cached_comments is not None:
+            page.object_list = cached_comments
+            return paginator, page, cached_comments, is_paginated
+
+        comments = list(object_list)
+        cache_service.set_value(comments)
+        page.object_list = comments
+        return paginator, page, comments, is_paginated
 
     def get_ordering(self):
         ordering = self._get_ordering(

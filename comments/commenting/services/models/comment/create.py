@@ -3,6 +3,7 @@ from commenting.models import Comment
 from core.services import BaseModelCreateService, BaseModelService
 from django.core.files import File
 
+from .cache import invalidate_comment_list_cache, invalidate_comment_replies_cache
 from .image import ImageFormatter
 from .text import CommentTextSanitizer
 from .validation import CommentValidation
@@ -21,6 +22,14 @@ class CommentService(BaseModelService[Comment]):
             self.obj.additional_file = ImageFormatter.format_image(
                 self.obj.additional_file
             )
+
+    def save(self, update_fields: list[str] | None = None) -> Comment:
+        comment = super().save(update_fields=update_fields)
+        invalidate_comment_list_cache()
+        comment_id = comment.related_comment_id or comment.pk
+        if comment_id is not None:
+            invalidate_comment_replies_cache(comment_id)
+        return comment
 
 
 class CommentCreateService(BaseModelCreateService[Comment], CommentService):

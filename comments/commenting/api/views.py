@@ -1,7 +1,10 @@
 from captcha.serializers import CaptchaSerializer
 from commenting.models import Comment
+from commenting.services.models.author.cache import CommentAuthorCacheData
 from commenting.services.models.author.operations import get_or_create
+from commenting.services.models.comment.cache import CommentRepliesCacheData
 from commenting.services.models.comment.create import CommentCreateService
+from core.cache import CacheService
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
 from rest_framework.exceptions import ValidationError as APIValidationError
@@ -15,6 +18,8 @@ from .serializers import (
     CommentRepliesQuerySerializer,
     CommentReplySerializer,
 )
+
+type SerializedObject = dict[str, object]
 
 
 class CaptchaMixin:
@@ -42,8 +47,16 @@ class AuthorGetCreateView(CaptchaMixin, APIView):
                 else {"detail": error.messages}
             )
             raise APIValidationError(detail) from error
+        cache_service: CacheService[SerializedObject] = CacheService(
+            CommentAuthorCacheData(kwargs={"id": author.pk})
+        )
+        cached_result = cache_service.get_value()
+        if cached_result is not None:
+            return Response(cached_result, status=status.HTTP_200_OK)
+        response_data = AuthorGetCreateSerializer(author).data
+        cache_service.set_value(response_data)
         return Response(
-            AuthorGetCreateSerializer(author).data,
+            response_data,
             status=status.HTTP_200_OK,
         )
 
@@ -53,7 +66,6 @@ class CommentCreateView(CaptchaMixin, APIView):
         self.validate_captcha()
         serializer = CommentCreateSerializer(data=request.data)
         if not serializer.is_valid():
-            print(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         comment = CommentCreateService(
             text=serializer.validated_data["text"],
@@ -82,10 +94,20 @@ class CommentRepliesView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        comment = serializer.validated_data["comment"]
+        cache_service: CacheService[list[SerializedObject]] = CacheService(
+            CommentRepliesCacheData(kwargs={"comment_id": str(comment.pk)})
+        )
+        cached_replies = cache_service.get_value()
+        if cached_replies is not None:
+            return Response(cached_replies, status=status.HTTP_200_OK)
+
         related_comments = CommentReplySerializer(
-            Comment.objects.for_related_comment(
-                serializer.validated_data["comment"]
-            ).select_related("author", "target_comment__author"),
+            Comment.objects.for_related_comment(comment).select_related(
+                "author", "target_comment__author"
+            ),
             many=True,
         )
-        return Response(related_comments.data, status=status.HTTP_200_OK)
+        reply_data = [dict(reply) for reply in related_comments.data]
+        cache_service.set_value(reply_data)
+        return Response(reply_data, status=status.HTTP_200_OK)

@@ -4,7 +4,9 @@ from .create import CommentAuthorService, CreateCommentAuthorService
 from .types import AuthorData
 
 
-def get_or_create(username: str, email: str, home_page: str | None = None):
+def get_or_create(
+    username: str, email: str, home_page: str | None = None
+) -> CommentAuthor:
     data = AuthorData(email=email, username=username)
     author_obj = CommentAuthor.objects.get_author(data)
     if author_obj is None:

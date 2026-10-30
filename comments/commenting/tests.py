@@ -1,6 +1,7 @@
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -19,6 +20,7 @@ from commenting.services.models.comment.create import (
     CommentCreateService,
     CommentService,
 )
+from commenting.services.models.comment.managers import CommentQuerySet
 from commenting.services.models.comment.validation import CommentValidation
 from commenting.validators import FileFormatData
 
@@ -102,6 +104,9 @@ class CommentFileValidationTests(TestCase):
             ).validate_file()
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class CommentServiceTests(TestCase):
     def setUp(self):
         self.author = CommentAuthor.objects.create(
@@ -136,6 +141,25 @@ class CommentServiceTests(TestCase):
         self.assertEqual(comment.text, "comment text")
         self.assertIsNone(comment.related_comment_id)
         self.assertIsNone(comment.target_comment_id)
+
+    @patch(
+        "commenting.services.models.comment.create.invalidate_comment_replies_cache"
+    )
+    @patch("commenting.services.models.comment.create.invalidate_comment_list_cache")
+    def test_create_service_invalidates_comment_caches(
+        self,
+        invalidate_list_cache,
+        invalidate_replies_cache,
+    ):
+        service = CommentCreateService(
+            text="Comment text",
+            author_id=self.author.pk,
+        )
+
+        comment = service.create()
+
+        invalidate_list_cache.assert_called_once_with()
+        invalidate_replies_cache.assert_called_once_with(comment.pk)
 
     def test_create_service_sets_target_and_related_comment_for_main_reply(self):
         parent = Comment.objects.create(author=self.author, text="Parent comment")
@@ -220,6 +244,9 @@ class CommentServiceTests(TestCase):
         self.assertEqual(Comment.objects.count(), 1)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class CommentQuerySetTests(TestCase):
     def setUp(self):
         self.author = CommentAuthor.objects.create(
@@ -260,6 +287,9 @@ class CommentQuerySetTests(TestCase):
         )
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class CommentCreateApiTests(TestCase):
     url = "/api/commenting/comments/"
 
@@ -477,6 +507,9 @@ class CommentCreateApiTests(TestCase):
         self.assertIn("related_comment", response.data)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class CommentRepliesApiTests(TestCase):
     url = "/api/commenting/comments/replies/"
 
@@ -522,6 +555,34 @@ class CommentRepliesApiTests(TestCase):
         )
         self.assertTrue(response.data[0]["created_at"])
 
+    def test_get_uses_cached_reply_data(self):
+        self.client.get(self.url, {"comment_id": self.comment.pk})
+
+        with patch.object(
+            Comment.objects,
+            "for_related_comment",
+            side_effect=AssertionError("Replies should be read from cache"),
+        ):
+            response = self.client.get(self.url, {"comment_id": self.comment.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]["id"], self.reply.pk)
+
+    def test_new_reply_invalidates_cached_reply_data(self):
+        self.client.get(self.url, {"comment_id": self.comment.pk})
+        new_reply = CommentCreateService(
+            author_id=self.author.pk,
+            related_comment_id=self.comment.pk,
+            target_comment_id=self.comment.pk,
+            text="New reply",
+        ).create()
+
+        response = self.client.get(self.url, {"comment_id": self.comment.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertIn(new_reply.pk, [reply["id"] for reply in response.data])
+
     def test_get_returns_bad_request_when_comment_id_is_missing(self):
         response = self.client.get(self.url)
 
@@ -535,6 +596,9 @@ class CommentRepliesApiTests(TestCase):
         self.assertIn("comment_id", response.data)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class CommentAuthorServiceTests(TestCase):
     def setUp(self):
         self.author = CommentAuthor.objects.create(
@@ -556,6 +620,32 @@ class CommentAuthorServiceTests(TestCase):
         self.assertIsNotNone(author.pk)
         self.assertEqual(author.username, "newauthor")
         self.assertEqual(CommentAuthor.objects.count(), 2)
+
+    @patch(
+        "commenting.services.models.author.create.invalidate_comment_author_cache"
+    )
+    def test_create_service_invalidates_author_cache(self, invalidate_cache):
+        service = CreateCommentAuthorService(
+            username="cachedauthor",
+            email="cached@example.com",
+            home_page=None,
+        )
+
+        author = service.create()
+
+        invalidate_cache.assert_called_once_with(author.pk)
+
+    @patch("commenting.services.models.author.create.invalidate_comment_list_cache")
+    def test_create_service_invalidates_comment_list_cache(self, invalidate_cache):
+        service = CreateCommentAuthorService(
+            username="cachedauthor",
+            email="cached@example.com",
+            home_page=None,
+        )
+
+        service.create()
+
+        invalidate_cache.assert_called_once_with()
 
     def test_create_service_rejects_duplicate_username(self):
         service = CreateCommentAuthorService(
@@ -583,13 +673,17 @@ class CommentAuthorServiceTests(TestCase):
         self.assertIsNone(service.obj.pk)
         self.assertEqual(CommentAuthor.objects.count(), 1)
 
-    def test_update_home_page_url_saves_author(self):
+    @patch(
+        "commenting.services.models.author.create.invalidate_comment_author_cache"
+    )
+    def test_update_home_page_url_saves_author(self, invalidate_cache):
         service = CommentAuthorService(self.author)
 
         service.update_home_page_url("https://new.example.com")
 
         self.author.refresh_from_db()
         self.assertEqual(self.author.home_page, "https://new.example.com")
+        invalidate_cache.assert_called_once_with(self.author.pk)
 
     def test_get_or_create_creates_author_when_missing(self):
         author = get_or_create(
@@ -663,6 +757,9 @@ class AuthorGetCreateApiTests(TestCase):
         self.assertEqual(CommentAuthor.objects.count(), 1)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class CommentListViewTests(TestCase):
     def setUp(self):
         self.author = CommentAuthor.objects.create(
@@ -683,6 +780,78 @@ class CommentListViewTests(TestCase):
         self.assertEqual(len(response.context["comment_list"]), 25)
         self.assertContains(response, 'id="comment-create-form"')
         self.assertContains(response, "Наступна")
+
+    def test_comment_list_uses_cached_models(self):
+        self.client.get("/")
+
+        original_fetch_all = CommentQuerySet._fetch_all
+
+        def fail_if_queryset_is_not_cached(queryset):
+            if queryset._result_cache is None:
+                raise AssertionError("Page models should be read from cache")
+            return original_fetch_all(queryset)
+
+        with patch.object(
+            CommentQuerySet,
+            "_fetch_all",
+            fail_if_queryset_is_not_cached,
+        ):
+            response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["comment_list"]), 25)
+
+    def test_each_page_uses_its_own_cached_models(self):
+        first_page = self.client.get("/")
+        second_page = self.client.get("/", {"page": 2})
+
+        original_fetch_all = CommentQuerySet._fetch_all
+
+        def fail_if_queryset_is_not_cached(queryset):
+            if queryset._result_cache is None:
+                raise AssertionError("Page models should be read from cache")
+            return original_fetch_all(queryset)
+
+        with patch.object(
+            CommentQuerySet,
+            "_fetch_all",
+            fail_if_queryset_is_not_cached,
+        ):
+            cached_first_page = self.client.get("/")
+            cached_second_page = self.client.get("/", {"page": 2})
+
+        self.assertEqual(
+            [comment.pk for comment in cached_first_page.context["comment_list"]],
+            [comment.pk for comment in first_page.context["comment_list"]],
+        )
+        self.assertEqual(
+            [comment.pk for comment in cached_second_page.context["comment_list"]],
+            [comment.pk for comment in second_page.context["comment_list"]],
+        )
+
+    def test_new_comment_invalidates_cached_models(self):
+        self.client.get("/")
+        new_comment = CommentCreateService(
+            author_id=self.author.pk,
+            text="New main comment",
+        ).create()
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["comment_list"][0].pk,
+            new_comment.pk,
+        )
+
+    def test_sort_order_uses_separate_cached_models(self):
+        response = self.client.get(
+            "/",
+            {"field": "username", "orderingType": "asc"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["comment_list"]), 25)
 
     def test_comment_create_form_is_displayed_before_sort_form(self):
         response = self.client.get("/")
@@ -772,18 +941,18 @@ class CommentListViewTests(TestCase):
 
     def test_replies_button_is_rendered_only_for_comments_with_replies(self):
         parent = Comment.objects.first()
-        target = Comment.objects.create(
-            author=self.author,
+        target = CommentCreateService(
+            author_id=self.author.pk,
             text="First reply",
-            related_comment=parent,
-            target_comment=parent,
-        )
-        reply = Comment.objects.create(
-            author=self.author,
+            related_comment_id=parent.pk,
+            target_comment_id=parent.pk,
+        ).create()
+        CommentCreateService(
+            author_id=self.author.pk,
             text="Reply to first reply",
-            related_comment=parent,
-            target_comment=target,
-        )
+            related_comment_id=parent.pk,
+            target_comment_id=target.pk,
+        ).create()
 
         response = self.client.get("/")
 
