@@ -1,5 +1,6 @@
+from api.authentication import CommentAuthorAuthentication
 from captcha.serializers import CaptchaSerializer
-from commenting.models import Comment
+from commenting.models import Comment, CommentAuthor
 from commenting.services.models.author.cache import CommentAuthorCacheData
 from commenting.services.models.author.operations import get_or_create
 from commenting.services.models.comment.cache import CommentRepliesCacheData
@@ -11,9 +12,11 @@ from core.cache import CacheService
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
 from rest_framework.exceptions import ValidationError as APIValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import AccessToken
 
 from .serializers import (
     AuthorGetCreateSerializer,
@@ -36,6 +39,8 @@ class CaptchaMixin:
 
 
 class AuthorGetCreateView(CaptchaMixin, APIView):
+    authentication_classes = [CommentAuthorAuthentication]
+
     def post(self, request: Request) -> Response:
         self.validate_captcha()
         serializer = AuthorGetCreateSerializer(data=request.data)
@@ -54,10 +59,16 @@ class AuthorGetCreateView(CaptchaMixin, APIView):
             CommentAuthorCacheData(kwargs={"id": author.pk})
         )
         cached_result = cache_service.get_value()
-        if cached_result is not None:
-            return Response(cached_result, status=status.HTTP_200_OK)
-        response_data = AuthorGetCreateSerializer(author).data
-        cache_service.set_value(response_data)
+        if cached_result is None:
+            cached_result = AuthorGetCreateSerializer(author).data
+            cache_service.set_value(cached_result)
+
+        token = AccessToken()
+        token["author_id"] = author.pk
+        token["username"] = author.username
+        token["email"] = author.email
+        token["home_page"] = author.home_page
+        response_data = {**cached_result, "token": str(token)}
         return Response(
             response_data,
             status=status.HTTP_200_OK,
@@ -65,6 +76,9 @@ class AuthorGetCreateView(CaptchaMixin, APIView):
 
 
 class CommentCreateView(CaptchaMixin, APIView):
+    # permission_classes = [IsAuthenticated]
+    # authentication_classes = [CommentAuthorAuthentication]
+
     def post(self, request: Request) -> Response:
         self.validate_captcha()
         serializer = CommentCreateSerializer(data=request.data)
@@ -119,3 +133,14 @@ class CommentRepliesView(APIView):
         reply_data = [dict(reply) for reply in related_comments.data]
         cache_service.set_value(reply_data)
         return Response(reply_data, status=status.HTTP_200_OK)
+
+
+class AuthorGetView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CommentAuthorAuthentication]
+
+    def get(self, request: Request):
+        author: CommentAuthor = request.user
+        return Response(
+            AuthorGetCreateSerializer(author).data, status=status.HTTP_200_OK
+        )

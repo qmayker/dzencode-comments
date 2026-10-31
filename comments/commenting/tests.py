@@ -305,6 +305,8 @@ class CommentCreateApiTests(TestCase):
         }
 
     def test_author_response_can_be_used_to_create_comment(self):
+        from rest_framework_simplejwt.tokens import AccessToken
+
         author_response = self.client.post(
             "/api/commenting/authors/",
             data={
@@ -318,6 +320,22 @@ class CommentCreateApiTests(TestCase):
             status.HTTP_200_OK,
             author_response.data,
         )
+        author = CommentAuthor.objects.get(pk=author_response.data["id"])
+        token = AccessToken(author_response.data["token"])
+        self.assertEqual(token["author_id"], author.pk)
+        self.assertEqual(token["username"], author.username)
+        self.assertEqual(token["email"], author.email)
+        self.assertEqual(token["home_page"], author.home_page)
+
+        author_details = self.client.get(
+            "/api/commenting/get-author/",
+            HTTP_AUTHORIZATION=f"Bearer {author_response.data['token']}",
+        )
+        self.assertEqual(author_details.status_code, status.HTTP_200_OK)
+        self.assertEqual(author_details.data["id"], author.pk)
+        self.assertEqual(author_details.data["username"], author.username)
+        self.assertEqual(author_details.data["email"], author.email)
+        self.assertEqual(author_details.data["home_page"], author.home_page)
 
         response = self.client.post(
             self.url,
@@ -870,6 +888,7 @@ class CommentListViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
+        self.assertContains(response, "window.authorGetUrl")
         self.assertEqual(content.count('id="comment-reply-form"'), 1)
         self.assertIn(
             '<div id="comment-reply-storage" hidden>',

@@ -160,3 +160,12 @@ CAPTCHA_LENGTH = 6
 
 TXT_FILE_SIZE = 1  # Кілобайти
 IMAGE_FORMATS = ["jpg", "gif", "png"]
+
+# rest-framework
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "api.authentication.CommentAuthorAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+}

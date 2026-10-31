@@ -14,6 +14,10 @@ from .validators import CommentTextTagsValidator, FileFormatData, UserNameValida
 class CommentAuthor(TimeStampedModel):
     objects = CommentAuthorManager()
 
+    @property
+    def is_authenticated(self) -> bool:
+        return True
+
     username = models.CharField(
         max_length=100,
         validators=[UserNameValidator()],

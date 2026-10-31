@@ -1,33 +1,74 @@
 async function postJson(url, data) {
-    const isFormData = data instanceof FormData;
-    const headers = {
-        "X-CSRFToken": Cookies.get("csrftoken")
-    };
-    if (!isFormData) {
-        headers["Content-Type"] = "application/json";
+  const isFormData = data instanceof FormData;
+  const headers = {
+    "X-CSRFToken": Cookies.get("csrftoken"),
+  };
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: isFormData ? data : JSON.stringify(data),
+  });
+  const responseData = await response.json();
+
+  if (!response.ok) {
+    const message = Object.values(responseData)
+      .flat()
+      .join(" ");
+    throw new Error(message || `API request failed (${response.status}).`);
+  }
+
+  return responseData;
+}
+
+async function getStoredAuthor(url) {
+  const token = localStorage.getItem("comment_token");
+  if (!token) {
+    return null;
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const responseData = await response.json();
+
+  if (response.status === 401) {
+    localStorage.removeItem("comment_token");
+    return null;
+  }
+  if (!response.ok) {
+    const message = Object.values(responseData)
+      .flat()
+      .join(" ");
+    throw new Error(message || `API request failed (${response.status}).`);
+  }
+
+  return responseData;
+}
+
+function fillAuthorForm(form, author, overwrite = false) {
+  for (const fieldName of ["username", "email", "home_page"]) {
+    const field = form.elements.namedItem(fieldName);
+    if (overwrite || !field.value) {
+      field.value = author[fieldName] || "";
     }
+  }
+}
 
-    const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: isFormData ? data : JSON.stringify(data),
-    });
-    // console.log("Status:", response.status);
-    // console.log("Response:", await response.text());
-    const responseData = await response.json();
-
-    if (!response.ok) {
-        const message = Object.values(responseData)
-        .flat()
-        .join(" ");
-        throw new Error(message || `API request failed (${response.status}).`);
-    }
-
-    return responseData;
+function fillAuthorForms(author, overwrite = false) {
+  document
+    .querySelectorAll('form[data-api-form="comment-create"]')
+    .forEach((form) => fillAuthorForm(form, author, overwrite));
 }
 
 async function createComment({
   authorUrl,
+  storedAuthor,
   commentUrl,
   username,
   email,
@@ -39,11 +80,15 @@ async function createComment({
   targetCommentId = null,
   relatedCommentId = null,
 }) {
-  const author = await postJson(authorUrl, {
-    username,
-    email,
-    home_page: homePage || null,
-  });
+  let author = storedAuthor;
+  if (!author) {
+    author = await postJson(authorUrl, {
+      username,
+      email,
+      home_page: homePage || null,
+    });
+    localStorage.setItem("comment_token", author.token);
+  }
 
   const commentData = new FormData();
   commentData.set("author", author.id);
@@ -60,7 +105,8 @@ async function createComment({
     commentData.set("additional_file", additionalFile);
   }
 
-  return postJson(commentUrl, commentData);
+  const comment = await postJson(commentUrl, commentData);
+  return { comment, author };
 }
 
 window.createComment = createComment;
@@ -296,6 +342,20 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  let currentAuthor = null;
+  const authorLoad = getStoredAuthor(window.authorGetUrl)
+    .then((author) => {
+      currentAuthor = author;
+      if (author) {
+        fillAuthorForms(author);
+      }
+      return author;
+    })
+    .catch((error) => {
+      mainForm.querySelector('[role="status"]').textContent = error.message;
+      return null;
+    });
+
   function attachSubmitHandler(form, getReplyCommentIds) {
     const status = form.querySelector('[role="status"]');
 
@@ -311,8 +371,10 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error("Введіть код CAPTCHA.");
         }
 
-        const comment = await createComment({
+        await authorLoad;
+        const result = await createComment({
           authorUrl: window.authorGetCreateUrl,
+          storedAuthor: currentAuthor,
           commentUrl: window.commentCreateUrl,
           username: formData.get("username"),
           email: formData.get("email"),
@@ -323,6 +385,8 @@ document.addEventListener("DOMContentLoaded", () => {
           additionalFile: formData.get("additional_file"),
           ...getReplyCommentIds(),
         });
+        const { comment, author } = result;
+        currentAuthor = author;
 
         if (comment.related_comment) {
           if (form === replyForm) {
@@ -336,6 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         form.reset();
+        fillAuthorForms(currentAuthor, true);
         form.querySelector(".js-captcha-refresh")?.click();
       } catch (error) {
         status.textContent = error.message;
@@ -354,7 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
     relatedCommentId,
   }));
 
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     if (!(event.target instanceof Element)) {
       return;
     }
@@ -374,6 +439,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     targetCommentId = button.dataset.commentId;
     relatedCommentId = button.dataset.relatedCommentId;
+    await authorLoad;
+    if (currentAuthor) {
+      fillAuthorForm(replyForm, currentAuthor, true);
+    }
     comment.append(replySection);
     replyForm.scrollIntoView({ behavior: "smooth", block: "center" });
     replyForm.querySelector('[name="text"]').focus();
