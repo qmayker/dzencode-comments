@@ -3,7 +3,10 @@ from commenting.models import Comment
 from commenting.services.models.author.cache import CommentAuthorCacheData
 from commenting.services.models.author.operations import get_or_create
 from commenting.services.models.comment.cache import CommentRepliesCacheData
-from commenting.services.models.comment.create import CommentCreateService
+from commenting.services.models.comment.create import (
+    CommentCreateService,
+    CommentReplyCreateService,
+)
 from core.cache import CacheService
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
@@ -67,21 +70,26 @@ class CommentCreateView(CaptchaMixin, APIView):
         serializer = CommentCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        comment = CommentCreateService(
-            text=serializer.validated_data["text"],
-            author_id=serializer.validated_data["author"].pk,
-            related_comment_id=(
-                serializer.validated_data["related_comment"].pk
-                if serializer.validated_data.get("related_comment")
-                else None
-            ),
-            target_comment_id=(
-                serializer.validated_data["target_comment"].pk
-                if serializer.validated_data.get("target_comment")
-                else None
-            ),
-            additional_file=serializer.validated_data.get("additional_file"),
-        ).create()
+        text = serializer.validated_data["text"]
+        author_id = serializer.validated_data["author"].pk
+        additional_file = serializer.validated_data.get("additional_file")
+        target_comment = serializer.validated_data.get("target_comment")
+
+        if target_comment is None:
+            comment_service = CommentCreateService(
+                text=text,
+                author_id=author_id,
+                additional_file=additional_file,
+            )
+        else:
+            comment_service = CommentReplyCreateService(
+                text=text,
+                author_id=author_id,
+                related_comment_id=serializer.validated_data["related_comment"].pk,
+                target_comment_id=target_comment.pk,
+                additional_file=additional_file,
+            )
+        comment = comment_service.create()
         return Response(
             CommentCreateSerializer(comment).data,
             status=status.HTTP_201_CREATED,

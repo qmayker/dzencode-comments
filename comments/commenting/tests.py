@@ -18,6 +18,7 @@ from commenting.services.models.author.create import (
 from commenting.services.models.author.operations import get_or_create
 from commenting.services.models.comment.create import (
     CommentCreateService,
+    CommentReplyCreateService,
     CommentService,
 )
 from commenting.services.models.comment.managers import CommentQuerySet
@@ -163,7 +164,7 @@ class CommentServiceTests(TestCase):
 
     def test_create_service_sets_target_and_related_comment_for_main_reply(self):
         parent = Comment.objects.create(author=self.author, text="Parent comment")
-        service = CommentCreateService(
+        service = CommentReplyCreateService(
             text="Reply text",
             author_id=self.author.pk,
             target_comment_id=parent.pk,
@@ -184,7 +185,7 @@ class CommentServiceTests(TestCase):
             related_comment=parent,
             target_comment=parent,
         )
-        service = CommentCreateService(
+        service = CommentReplyCreateService(
             text="Reply to first reply",
             author_id=self.author.pk,
             target_comment_id=first_reply.pk,
@@ -198,10 +199,11 @@ class CommentServiceTests(TestCase):
         self.assertIn(reply, parent.replies.all())
 
     def test_create_service_rejects_nonexistent_target_comment(self):
-        service = CommentCreateService(
+        service = CommentReplyCreateService(
             text="Reply text",
             author_id=self.author.pk,
             target_comment_id=999,
+            related_comment_id=999,
         )
 
         with self.assertRaises(ValidationError):
@@ -218,7 +220,7 @@ class CommentServiceTests(TestCase):
             related_comment=parent,
             target_comment=parent,
         )
-        service = CommentCreateService(
+        service = CommentReplyCreateService(
             text="Invalid reply",
             author_id=self.author.pk,
             target_comment_id=target.pk,
@@ -232,7 +234,7 @@ class CommentServiceTests(TestCase):
 
     def test_create_service_requires_related_comment_when_target_is_set(self):
         target = Comment.objects.create(author=self.author, text="Target comment")
-        service = CommentCreateService(
+        service = CommentReplyCreateService(
             text="Reply without thread root",
             author_id=self.author.pk,
             target_comment_id=target.pk,
@@ -570,7 +572,7 @@ class CommentRepliesApiTests(TestCase):
 
     def test_new_reply_invalidates_cached_reply_data(self):
         self.client.get(self.url, {"comment_id": self.comment.pk})
-        new_reply = CommentCreateService(
+        new_reply = CommentReplyCreateService(
             author_id=self.author.pk,
             related_comment_id=self.comment.pk,
             target_comment_id=self.comment.pk,
@@ -941,13 +943,13 @@ class CommentListViewTests(TestCase):
 
     def test_replies_button_is_rendered_only_for_comments_with_replies(self):
         parent = Comment.objects.first()
-        target = CommentCreateService(
+        target = CommentReplyCreateService(
             author_id=self.author.pk,
             text="First reply",
             related_comment_id=parent.pk,
             target_comment_id=parent.pk,
         ).create()
-        CommentCreateService(
+        CommentReplyCreateService(
             author_id=self.author.pk,
             text="Reply to first reply",
             related_comment_id=parent.pk,
