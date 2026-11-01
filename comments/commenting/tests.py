@@ -3,9 +3,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from channels.routing import URLRouter
+from channels.testing import WebsocketCommunicator
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
 from rest_framework import status
 
@@ -22,6 +27,7 @@ from commenting.services.models.comment.create import (
     CommentService,
 )
 from commenting.services.models.comment.managers import CommentQuerySet
+from commenting.services.models.comment.socket.types import CommentsGroup
 from commenting.services.models.comment.validation import CommentValidation
 from commenting.validators import FileFormatData
 
@@ -292,6 +298,11 @@ class CommentQuerySetTests(TestCase):
 @override_settings(
     CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 )
+@override_settings(
+    CHANNEL_LAYERS={
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
+)
 class CommentCreateApiTests(TestCase):
     url = "/api/commenting/comments/"
 
@@ -373,6 +384,30 @@ class CommentCreateApiTests(TestCase):
         self.assertIsNone(response.data["target_comment"])
         self.assertEqual(Comment.objects.get().text, "API comment")
 
+    @patch("commenting.api.views.WebSocketCommentEvents")
+    def test_post_broadcasts_comment_to_page_room(self, socket_events):
+        author = CommentAuthor.objects.create(
+            username="socket-user",
+            email="socket@example.com",
+        )
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "Live comment",
+                **self.captcha_payload(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        socket_events.return_value.broadcast_comment_created.assert_called_once()
+        (comment_data,) = (
+            socket_events.return_value.broadcast_comment_created.call_args.args
+        )
+        self.assertEqual(comment_data["id"], response.data["id"])
+        self.assertEqual(comment_data["text"], "Live comment")
+
     def test_post_saves_uploaded_file_under_configured_upload_path(self):
         author = CommentAuthor.objects.create(
             username="file-upload-user",
@@ -423,7 +458,11 @@ class CommentCreateApiTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(response.data["file_type"], FileTypeEnum.TXT)
 
-    def test_post_creates_reply_to_main_comment(self):
+    @patch("commenting.api.views.WebSocketCommentEvents")
+    def test_post_broadcasts_reply_for_reply_count(
+        self,
+        socket_events,
+    ):
         author = CommentAuthor.objects.create(
             username="replyuser",
             email="reply@example.com",
@@ -446,6 +485,11 @@ class CommentCreateApiTests(TestCase):
         reply = Comment.objects.get(pk=response.data["id"])
         self.assertEqual(reply.related_comment, parent)
         self.assertEqual(reply.target_comment, parent)
+        socket_events.return_value.broadcast_comment_created.assert_not_called()
+        socket_events.return_value.broadcast_reply_created.assert_called_once_with(
+            parent.pk,
+            reply.pk,
+        )
 
     def test_post_creates_reply_to_reply_in_the_same_parent_thread(self):
         author = CommentAuthor.objects.create(
@@ -780,15 +824,75 @@ class AuthorGetCreateApiTests(TestCase):
 @override_settings(
     CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 )
+@override_settings(
+    CHANNEL_LAYERS={
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
+)
+class CommentWebSocketTests(SimpleTestCase):
+    def test_receives_new_comment_from_shared_room(self):
+        from commenting.services.models.comment.socket.routing import (
+            websocket_urlpatterns,
+        )
+
+        async def receive_comment():
+            communicator = WebsocketCommunicator(
+                URLRouter(websocket_urlpatterns),
+                "/ws/comments/",
+            )
+            connected, _ = await communicator.connect()
+            self.assertTrue(connected)
+
+            comment_data = {"id": 42, "text": "Live comment"}
+            await get_channel_layer().group_send(
+                CommentsGroup().room_name,
+                {
+                    "type": "comment_created",
+                    "comment": comment_data,
+                },
+            )
+            message = await communicator.receive_json_from()
+            self.assertEqual(
+                message,
+                {"type": "comment.created", "comment": comment_data},
+            )
+            reply_event = {
+                "related_comment_id": 42,
+                "reply_id": 43,
+            }
+            await get_channel_layer().group_send(
+                CommentsGroup().room_name,
+                {
+                    "type": "reply_created",
+                    "comment": reply_event,
+                },
+            )
+            reply_message = await communicator.receive_json_from()
+            self.assertEqual(
+                reply_message,
+                {"type": "reply.created", "comment": reply_event},
+            )
+            await communicator.disconnect()
+
+        async_to_sync(receive_comment)()
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class CommentListViewTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.author = CommentAuthor.objects.create(
             username="list-author",
             email="list@example.com",
         )
         Comment.objects.bulk_create(
             [
-                Comment(author=self.author, text=f"Comment {number}")
+                Comment(
+                    author=self.author,
+                    text=f"Pagination test comment {number}",
+                )
                 for number in range(26)
             ]
         )
@@ -799,6 +903,8 @@ class CommentListViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["comment_list"]), 25)
         self.assertContains(response, 'id="comment-create-form"')
+        self.assertContains(response, 'id="new-comments-container"')
+        self.assertContains(response, "Переглянути нові коментарі (0)")
         self.assertContains(response, "Наступна")
 
     def test_comment_list_uses_cached_models(self):
@@ -848,6 +954,8 @@ class CommentListViewTests(TestCase):
             [comment.pk for comment in cached_second_page.context["comment_list"]],
             [comment.pk for comment in second_page.context["comment_list"]],
         )
+        self.assertEqual(len(cached_first_page.context["comment_list"]), 25)
+        self.assertEqual(len(cached_second_page.context["comment_list"]), 1)
 
     def test_new_comment_invalidates_cached_models(self):
         self.client.get("/")
@@ -990,4 +1098,4 @@ class CommentListViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["comment_list"]), 1)
-        self.assertContains(response, "Comment 0")
+        self.assertContains(response, "Pagination test comment 0")

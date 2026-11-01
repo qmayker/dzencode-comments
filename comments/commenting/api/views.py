@@ -8,6 +8,7 @@ from commenting.services.models.comment.create import (
     CommentCreateService,
     CommentReplyCreateService,
 )
+from commenting.services.models.comment.socket import WebSocketCommentEvents
 from core.cache import CacheService
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
@@ -88,7 +89,6 @@ class CommentCreateView(CaptchaMixin, APIView):
         author_id = serializer.validated_data["author"].pk
         additional_file = serializer.validated_data.get("additional_file")
         target_comment = serializer.validated_data.get("target_comment")
-
         if target_comment is None:
             comment_service = CommentCreateService(
                 text=text,
@@ -104,8 +104,14 @@ class CommentCreateView(CaptchaMixin, APIView):
                 additional_file=additional_file,
             )
         comment = comment_service.create()
+        response_data = CommentCreateSerializer(comment).data
+        socket = WebSocketCommentEvents()
+        if comment.related_comment_id is None:
+            socket.broadcast_comment_created(dict(response_data))
+        else:
+            socket.broadcast_reply_created(comment.related_comment_id, comment.pk)
         return Response(
-            CommentCreateSerializer(comment).data,
+            response_data,
             status=status.HTTP_201_CREATED,
         )
 

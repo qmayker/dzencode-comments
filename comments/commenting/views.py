@@ -1,5 +1,6 @@
 from enum import StrEnum
 
+from core.cache import CacheService
 from django.core.cache import cache
 from django.db.models import QuerySet
 from django.views.generic import ListView
@@ -7,7 +8,6 @@ from django.views.generic import ListView
 from commenting.forms import CommentCreateForm
 from commenting.models import Comment
 from commenting.services.models.comment.cache import CommentListCacheData
-from core.cache import CacheService
 
 from .enums import FileTypeEnum
 

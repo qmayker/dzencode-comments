@@ -32,6 +32,8 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
+    "channels",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -168,4 +170,20 @@ REST_FRAMEWORK = {
         "api.authentication.CommentAuthorAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
+}
+
+# Daphne
+ASGI_APPLICATION = "comments.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                os.environ.get(
+                    "CHANNEL_REDIS_URL",
+                    "redis://127.0.0.1:6379/2",
+                )
+            ],
+        },
+    },
 }

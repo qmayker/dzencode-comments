@@ -1,4 +1,22 @@
 services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: daphne -b 0.0.0.0 -p 8000 comments.asgi:application
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379/1
+      CHANNEL_REDIS_URL: redis://redis:6379/2
+      CELERY_BROKER_URL: redis://redis:6379/0
+    volumes:
+      - ./comments:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     ports:

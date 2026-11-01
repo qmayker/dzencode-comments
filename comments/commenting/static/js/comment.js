@@ -37,7 +37,7 @@ async function getStoredAuthor(url) {
   });
   const responseData = await response.json();
 
-  if (response.status === 401) {
+  if (response.status === 401 || response.status === 403) {
     localStorage.removeItem("comment_token");
     return null;
   }
@@ -231,8 +231,67 @@ window.renderReply = renderReply;
 function updateRepliesButtonLabel(button, expanded) {
   const count = button.dataset.replyCount;
   button.textContent = expanded
-    ? `Сховати відповіді (${count})`
+    ? `Сховати відповіді`
     : `Переглянути відповіді (${count})`;
+}
+
+const countedReplyIds = new Set();
+
+function findRootComment(commentId) {
+  return Array.from(
+    document.querySelectorAll(".comment-list > .comment[data-comment-id]"),
+  ).find((comment) => comment.dataset.commentId === String(commentId));
+}
+
+function ensureRepliesButton(root, commentId) {
+  let button = root.querySelector(".comment-view-replies-button");
+  if (button) {
+    return button;
+  }
+
+  button = document.createElement("button");
+  button.className = "comment-view-replies-button";
+  button.type = "button";
+  button.dataset.commentId = commentId;
+  button.dataset.replyCount = "0";
+  button.setAttribute("aria-expanded", "false");
+  button.setAttribute("aria-controls", `comment-replies-${commentId}`);
+  button.setAttribute("aria-live", "polite");
+  root.querySelector(":scope > .comment-actions").append(button);
+  bindRepliesButton(button);
+  return button;
+}
+
+function ensureRepliesContainer(root, commentId) {
+  let replies = document.getElementById(`comment-replies-${commentId}`);
+  if (replies) {
+    return replies;
+  }
+
+  function rootPendingReplies(commentId) {
+    return document.getElementById(`comment-pending-replies-${commentId}`);
+  }
+
+  function ensurePendingRepliesContainer(root, commentId) {
+    let replies = rootPendingReplies(commentId);
+    if (replies) {
+      return replies;
+    }
+
+    replies = document.createElement("div");
+    replies.id = `comment-pending-replies-${commentId}`;
+    replies.className = "comment-replies comment-pending-replies";
+    root.querySelector(":scope > .comment-actions").before(replies);
+    return replies;
+  }
+
+  replies = document.createElement("div");
+  replies.id = `comment-replies-${commentId}`;
+  replies.className = "comment-replies";
+  replies.dataset.loaded = "false";
+  replies.hidden = true;
+  root.querySelector(":scope > .comment-actions").after(replies);
+  return replies;
 }
 
 function bindRepliesButton(button) {
@@ -259,8 +318,14 @@ function bindRepliesButton(button) {
         button.dataset.commentId,
       );
       replyData.forEach((reply) => {
-        replies.append(renderReply(reply));
+        const replyAlreadyRendered = Array.from(
+          replies.querySelectorAll(".comment[data-comment-id]"),
+        ).some((element) => element.dataset.commentId === String(reply.id));
+        if (!replyAlreadyRendered) {
+          replies.append(renderReply(reply));
+        }
       });
+      rootPendingReplies(button.dataset.commentId)?.remove();
       replies.dataset.loaded = "true";
       replies.hidden = false;
       button.setAttribute("aria-expanded", "true");
@@ -283,57 +348,134 @@ function appendCommentToList(comment) {
 }
 
 function appendReplyToThread(reply) {
-  const root = document.querySelector(
-    `.comment-list > .comment[data-comment-id="${reply.related_comment}"]`,
-  );
+  const root = findRootComment(reply.related_comment);
   if (!root) {
     return;
   }
 
-  const replyData = { ...reply, target_comment_username: reply.target_comment_username};
-
-  let replies = document.getElementById(`comment-replies-${reply.related_comment}`);
-  let viewButton = root.querySelector(".comment-view-replies-button");
-
-  if (!viewButton) {
-    viewButton = document.createElement("button");
-    viewButton.className = "comment-view-replies-button";
-    viewButton.type = "button";
-    viewButton.dataset.commentId = reply.related_comment;
-    viewButton.dataset.replyCount = "0";
-    viewButton.setAttribute("aria-expanded", "false");
-    viewButton.setAttribute(
-      "aria-controls",
-      `comment-replies-${reply.related_comment}`,
+  const viewButton = ensureRepliesButton(root, reply.related_comment);
+  const replies = ensureRepliesContainer(root, reply.related_comment);
+  const replyId = String(reply.id);
+  if (replies.dataset.loaded !== "true") {
+    const pendingReplies = ensurePendingRepliesContainer(
+      root,
+      reply.related_comment,
     );
-    viewButton.setAttribute("aria-live", "polite");
-    root.querySelector(":scope > .comment-actions").append(viewButton);
-    bindRepliesButton(viewButton);
-  }
-
-  const count = Number(viewButton.dataset.replyCount) + 1;
-  viewButton.dataset.replyCount = String(count);
-
-  // Replies that were not loaded yet will come from the server on first expand.
-  if (replies && replies.dataset.loaded !== "true") {
-    updateRepliesButtonLabel(viewButton, false);
+    const replyAlreadyPending = Array.from(
+      pendingReplies.querySelectorAll(".comment[data-comment-id]"),
+    ).some((element) => element.dataset.commentId === replyId);
+    if (!replyAlreadyPending) {
+      pendingReplies.append(renderReply(reply));
+    }
     return;
   }
 
-  if (!replies) {
-    replies = document.createElement("div");
-    replies.id = `comment-replies-${reply.related_comment}`;
-    replies.className = "comment-replies";
-    replies.dataset.loaded = "true";
-    root.querySelector(":scope > .comment-actions").after(replies);
+  const existingReply = Array.from(
+    replies.querySelectorAll(".comment[data-comment-id]"),
+  ).some((element) => element.dataset.commentId === replyId);
+  if (existingReply) {
+    return;
   }
-  replies.append(renderReply(replyData));
+
+  replies.append(
+    renderReply({
+      ...reply,
+      target_comment_username: reply.target_comment_username,
+    }),
+  );
   replies.hidden = false;
   viewButton.setAttribute("aria-expanded", "true");
   updateRepliesButtonLabel(viewButton, true);
 }
 
+window.addEventListener("reply-created", (event) => {
+  const reply = event.detail;
+  if (!reply?.reply_id || !reply.related_comment_id) {
+    return;
+  }
+
+  const root = findRootComment(reply.related_comment_id);
+  if (!root) {
+    return;
+  }
+
+  const replyId = String(reply.reply_id);
+  if (countedReplyIds.has(replyId)) {
+    return;
+  }
+
+  const button = ensureRepliesButton(root, reply.related_comment_id);
+  ensureRepliesContainer(root, reply.related_comment_id);
+  button.dataset.replyCount = String(Number(button.dataset.replyCount) + 1);
+  countedReplyIds.add(replyId);
+  updateRepliesButtonLabel(button, button.getAttribute("aria-expanded") === "true");
+});
+
+const pendingNewComments = [];
+
+function removePendingNewComment(commentId) {
+  const pendingIndex = pendingNewComments.findIndex(
+    (comment) => String(comment.id) === String(commentId),
+  );
+  if (pendingIndex !== -1) {
+    pendingNewComments.splice(pendingIndex, 1);
+    updateNewCommentsButton();
+  }
+}
+
+function updateNewCommentsButton() {
+  const container = document.getElementById("new-comments-container");
+  const button = document.getElementById("new-comments-button");
+  if (!container || !button) {
+    return;
+  }
+
+  const count = pendingNewComments.length;
+  container.hidden = count === 0;
+  button.textContent = `Переглянути нові коментарі (${count})`;
+}
+
+window.addEventListener("comment-created", (event) => {
+  const comment = event.detail;
+  if (!comment || !comment.id) {
+    return;
+  }
+
+  const commentId = String(comment.id);
+  const alreadyRendered = Array.from(
+    document.querySelectorAll(".comment[data-comment-id]"),
+  ).some((element) => element.dataset.commentId === commentId);
+  if (alreadyRendered) {
+    return;
+  }
+
+  if (
+    pendingNewComments.some(
+      (pendingComment) => String(pendingComment.id) === commentId,
+    )
+  ) {
+    return;
+  }
+
+  pendingNewComments.unshift(comment);
+  updateNewCommentsButton();
+});
+
 document.addEventListener("DOMContentLoaded", () => {
+  const newCommentsButton = document.getElementById("new-comments-button");
+  newCommentsButton?.addEventListener("click", () => {
+    for (const comment of pendingNewComments.slice().reverse()) {
+      if (comment.related_comment) {
+        appendReplyToThread(comment);
+      } else {
+        appendCommentToList(comment);
+      }
+    }
+
+    pendingNewComments.length = 0;
+    updateNewCommentsButton();
+  });
+
   const mainForm = document.getElementById("comment-create-form");
   const replyForm = document.getElementById("comment-reply-form");
   const replySection = document.querySelector(".comment-reply-form");
@@ -387,6 +529,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const { comment, author } = result;
         currentAuthor = author;
+        removePendingNewComment(comment.id);
 
         if (comment.related_comment) {
           if (form === replyForm) {

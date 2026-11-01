@@ -23,6 +23,12 @@
         {% include "commenting/comment/_create_form.html" with form=comment_reply_form title="Відповісти на коментар" form_class="comment-reply-form" title_id="comment-reply-title" form_id="comment-reply-form" status_id="comment-reply-status" %}
       </div>
 
+      <div id="new-comments-container" class="new-comments" hidden>
+        <button id="new-comments-button" type="button">
+          Переглянути нові коментарі (0)
+        </button>
+      </div>
+
       <form class="sort-form" method="get">
         <label for="field">Сортувати за</label>
         <select id="field" name="field">
@@ -82,5 +88,6 @@
     <script src="{% static 'js/captcha.js' %}"></script>
     <script src="{% static 'js/txt.js' %}"></script>
     <script src="{% static 'js/comment.js' %}"></script>
+    <script src="{% static 'js/sockets.js' %}"></script>
   </body>
 </html>
