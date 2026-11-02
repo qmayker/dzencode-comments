@@ -11,10 +11,17 @@ logger = get_task_logger(__name__)
 def send_reply_email(reply_id: int) -> int:
     from commenting.models import Comment
 
-    reply = Comment.objects.select_related(
-        "author",
-        "target_comment__author",
-    ).get(pk=reply_id)
+    reply = (
+        Comment.objects.select_related(
+            "author",
+            "target_comment__author",
+        )
+        .filter(pk=reply_id)
+        .first()
+    )
+    if reply is None:
+        logger.error(f"Couldnt find comment to reply with id {reply_id}")
+        return 0
     target = reply.target_comment
     if target is None or target.author_id == reply.author_id:
         return 0
