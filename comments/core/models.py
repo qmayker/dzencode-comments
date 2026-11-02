@@ -7,3 +7,7 @@ class TimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+def get_model_name(model: models.Model):
+    return model._meta.model_name

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "commenting.apps.CommentingConfig",
+    "events.apps.EventsConfig",
     "rest_framework",
     "captcha",
 ]
@@ -187,3 +188,12 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Events
+
+EVENTS_REDIS_URL = os.environ.get(
+    "CHANNEL_REDIS_URL",
+    "redis://127.0.0.1:6379/3",
+)
+
+EVENTS_REDIS_KEY = "events"

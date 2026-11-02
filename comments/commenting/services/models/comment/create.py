@@ -3,8 +3,9 @@ from commenting.models import Comment
 from core.services import BaseModelCreateService, BaseModelService
 from django.core.files import File
 from django.db import transaction
+from events.events import EventCustomModel, Events
+from events.sender import RedisEventSender
 
-from .cache import invalidate_comment_list_cache, invalidate_comment_replies_cache
 from .image import ImageFormatter
 from .tasks import send_reply_email
 from .text import CommentTextSanitizer
@@ -25,13 +26,34 @@ class CommentService(BaseModelService[Comment]):
                 self.obj.additional_file
             )
 
+    def save_model(self, update_fields: list[str] | None = None) -> Comment:
+        return super().save(update_fields=update_fields)
+
     def save(self, update_fields: list[str] | None = None) -> Comment:
-        comment = super().save(update_fields=update_fields)
-        invalidate_comment_list_cache()
-        comment_id = comment.related_comment_id or comment.pk
-        if comment_id is not None:
-            invalidate_comment_replies_cache(comment_id)
+        comment = self.save_model(update_fields)
+        transaction.on_commit(
+            lambda: RedisEventSender(comment, Events.SAVE).send_event(
+                {"id": comment.pk, "related_comment_id": None}
+            )
+        )
         return comment
+
+
+class CommentReplyService(CommentService):
+    def save(self, update_fields: list[str] | None = None) -> Comment:
+        reply = self.save_model(update_fields)
+        transaction.on_commit(
+            lambda: RedisEventSender(
+                EventCustomModel.REPLY,
+                Events.SAVE,
+            ).send_event(
+                {
+                    "id": reply.pk,
+                    "related_comment_id": reply.related_comment_id,
+                }
+            )
+        )
+        return reply
 
 
 class CommentCreateService(BaseModelCreateService[Comment], CommentService):
@@ -51,7 +73,9 @@ class CommentCreateService(BaseModelCreateService[Comment], CommentService):
         super().__init__(obj)
 
 
-class CommentReplyCreateService(CommentCreateService):
+class CommentReplyCreateService(BaseModelCreateService[Comment], CommentReplyService):
+    model = Comment
+
     def __init__(
         self,
         text: str,
@@ -67,7 +91,7 @@ class CommentReplyCreateService(CommentCreateService):
             related_comment_id=related_comment_id,
             additional_file=additional_file,
         )
-        CommentService.__init__(self, obj)
+        super().__init__(obj)
 
     def save(self, update_fields=None):
         reply_comment = super().save(update_fields)

@@ -1,7 +1,10 @@
 from django.contrib import admin
 
 from commenting.services.models.author.create import CommentAuthorService
-from commenting.services.models.comment.create import CommentService
+from commenting.services.models.comment.create import (
+    CommentReplyService,
+    CommentService,
+)
 
 from .models import Comment, CommentAuthor
 
@@ -21,6 +24,10 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ("author",)
     search_fields = ("author__username", "author__email")
 
-    def save_model(self, request, obj, form, change):
-        service = CommentService(obj)
+    def save_model(self, request, obj: Comment, form, change):
+        if obj.related_comment_id is None:
+            ServiceType = CommentService
+        else:
+            ServiceType = CommentReplyService
+        service = ServiceType(obj)
         service.save()

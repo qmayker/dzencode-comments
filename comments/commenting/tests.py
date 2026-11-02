@@ -30,6 +30,8 @@ from commenting.services.models.comment.managers import CommentQuerySet
 from commenting.services.models.comment.socket.types import CommentsGroup
 from commenting.services.models.comment.validation import CommentValidation
 from commenting.validators import FileFormatData
+from events.events import EventCustomModel, Events
+from events.receivers import CommentCreatedReceiver, CommentReplyCreatedReceiver
 
 
 def create_png_upload(filename):
@@ -149,24 +151,38 @@ class CommentServiceTests(TestCase):
         self.assertIsNone(comment.related_comment_id)
         self.assertIsNone(comment.target_comment_id)
 
-    @patch(
-        "commenting.services.models.comment.create.invalidate_comment_replies_cache"
-    )
-    @patch("commenting.services.models.comment.create.invalidate_comment_list_cache")
-    def test_create_service_invalidates_comment_caches(
-        self,
-        invalidate_list_cache,
-        invalidate_replies_cache,
-    ):
+    @patch("commenting.services.models.comment.create.RedisEventSender")
+    def test_save_sends_save_event_after_commit(self, event_sender_class):
         service = CommentCreateService(
             text="Comment text",
             author_id=self.author.pk,
         )
 
-        comment = service.create()
+        with self.captureOnCommitCallbacks(execute=True):
+            comment = service.create()
 
-        invalidate_list_cache.assert_called_once_with()
-        invalidate_replies_cache.assert_called_once_with(comment.pk)
+        event_sender_class.assert_called_once_with(comment, Events.SAVE)
+        event_sender_class.return_value.send_event.assert_called_once_with(
+            {"id": comment.pk, "related_comment_id": None}
+        )
+
+    @patch("commenting.services.models.comment.create.RedisEventSender")
+    def test_save_sends_reply_event_with_reply_model_name(self, event_sender_class):
+        parent = Comment.objects.create(author=self.author, text="Parent comment")
+        service = CommentReplyCreateService(
+            text="Reply text",
+            author_id=self.author.pk,
+            target_comment_id=parent.pk,
+            related_comment_id=parent.pk,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            reply = service.create()
+
+        event_sender_class.assert_called_once_with(EventCustomModel.REPLY, Events.SAVE)
+        event_sender_class.return_value.send_event.assert_called_once_with(
+            {"id": reply.pk, "related_comment_id": parent.pk}
+        )
 
     def test_create_service_sets_target_and_related_comment_for_main_reply(self):
         parent = Comment.objects.create(author=self.author, text="Parent comment")
@@ -640,6 +656,12 @@ class CommentRepliesApiTests(TestCase):
             target_comment_id=self.comment.pk,
             text="New reply",
         ).create()
+        CommentReplyCreatedReceiver().handle_event(
+            {
+                "id": new_reply.pk,
+                "related_comment_id": self.comment.pk,
+            }
+        )
 
         response = self.client.get(self.url, {"comment_id": self.comment.pk})
 
@@ -963,6 +985,9 @@ class CommentListViewTests(TestCase):
             author_id=self.author.pk,
             text="New main comment",
         ).create()
+        CommentCreatedReceiver().handle_event(
+            {"id": new_comment.pk, "related_comment_id": None}
+        )
 
         response = self.client.get("/")
 
