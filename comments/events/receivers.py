@@ -10,6 +10,7 @@ from commenting.services.models.comment.cache import (
     invalidate_comment_list_cache,
     invalidate_comment_replies_cache,
 )
+from commenting.services.models.comment.tasks import send_reply_email
 from core.models import get_model_name
 from django.db.models import Model
 
@@ -98,10 +99,15 @@ class CommentReplyCreatedReceiver(EventReceiver):
         if not isinstance(event, dict):
             raise TypeError("Comment reply event data must be a dictionary.")
 
+        reply_id = event.get("id")
+        if not isinstance(reply_id, int):
+            raise ValueError("Comment reply event data must contain an integer id.")
+
         related_comment_id = event.get("related_comment_id")
         if not isinstance(related_comment_id, int):
             raise ValueError(
                 "Comment reply event data must contain an integer related_comment_id."
             )
 
+        send_reply_email.delay(reply_id)
         invalidate_comment_replies_cache(related_comment_id)

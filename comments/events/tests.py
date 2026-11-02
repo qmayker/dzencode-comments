@@ -36,6 +36,7 @@ class CommentCreatedReceiverTests(TestCase):
             patch(
                 "events.receivers.invalidate_comment_replies_cache"
             ) as invalidate_replies,
+            patch("events.receivers.send_reply_email.delay") as send_reply_email,
         ):
             CommentCreatedReceiver().handle_event({"id": reply.pk})
             CommentReplyCreatedReceiver().handle_event(
@@ -44,6 +45,7 @@ class CommentCreatedReceiverTests(TestCase):
 
         invalidate_comment_list.assert_called_once_with()
         invalidate_replies.assert_called_once_with(parent.pk)
+        send_reply_email.assert_called_once_with(reply.pk)
 
     def test_author_receiver_invalidates_author_and_comment_list_caches(self):
         with (

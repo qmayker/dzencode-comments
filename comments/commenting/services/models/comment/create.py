@@ -7,7 +7,6 @@ from events.events import EventCustomModel, Events
 from events.sender import RedisEventSender
 
 from .image import ImageFormatter
-from .tasks import send_reply_email
 from .text import CommentTextSanitizer
 from .validation import CommentValidation
 
@@ -94,6 +93,4 @@ class CommentReplyCreateService(BaseModelCreateService[Comment], CommentReplySer
         super().__init__(obj)
 
     def save(self, update_fields=None):
-        reply_comment = super().save(update_fields)
-        transaction.on_commit(lambda: send_reply_email.delay(reply_comment.pk))
-        return reply_comment
+        return super().save(update_fields)
