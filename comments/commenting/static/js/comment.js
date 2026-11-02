@@ -262,26 +262,26 @@ function ensureRepliesButton(root, commentId) {
   return button;
 }
 
-function ensureRepliesContainer(root, commentId) {
-  let replies = document.getElementById(`comment-replies-${commentId}`);
+function rootPendingReplies(commentId) {
+  return document.getElementById(`comment-pending-replies-${commentId}`);
+}
+
+function ensurePendingRepliesContainer(root, commentId) {
+  let replies = rootPendingReplies(commentId);
   if (replies) {
     return replies;
   }
 
-  function rootPendingReplies(commentId) {
-    return document.getElementById(`comment-pending-replies-${commentId}`);
-  }
+  replies = document.createElement("div");
+  replies.id = `comment-pending-replies-${commentId}`;
+  replies.className = "comment-replies comment-pending-replies";
+  root.querySelector(":scope > .comment-actions").before(replies);
+  return replies;
+}
 
-  function ensurePendingRepliesContainer(root, commentId) {
-    let replies = rootPendingReplies(commentId);
-    if (replies) {
-      return replies;
-    }
-
-    replies = document.createElement("div");
-    replies.id = `comment-pending-replies-${commentId}`;
-    replies.className = "comment-replies comment-pending-replies";
-    root.querySelector(":scope > .comment-actions").before(replies);
+function ensureRepliesContainer(root, commentId) {
+  let replies = document.getElementById(`comment-replies-${commentId}`);
+  if (replies) {
     return replies;
   }
 
@@ -365,7 +365,7 @@ function appendReplyToThread(reply) {
       pendingReplies.querySelectorAll(".comment[data-comment-id]"),
     ).some((element) => element.dataset.commentId === replyId);
     if (!replyAlreadyPending) {
-      pendingReplies.append(renderReply(reply));
+      pendingReplies.prepend(renderReply(reply));
     }
     return;
   }
@@ -377,7 +377,7 @@ function appendReplyToThread(reply) {
     return;
   }
 
-  replies.append(
+  replies.prepend(
     renderReply({
       ...reply,
       target_comment_username: reply.target_comment_username,
