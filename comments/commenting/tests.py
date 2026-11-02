@@ -707,31 +707,21 @@ class CommentAuthorServiceTests(TestCase):
         self.assertEqual(author.username, "newauthor")
         self.assertEqual(CommentAuthor.objects.count(), 2)
 
-    @patch(
-        "commenting.services.models.author.create.invalidate_comment_author_cache"
-    )
-    def test_create_service_invalidates_author_cache(self, invalidate_cache):
+    @patch("commenting.services.models.author.create.RedisEventSender")
+    def test_create_service_sends_author_save_event(self, event_sender_class):
         service = CreateCommentAuthorService(
             username="cachedauthor",
             email="cached@example.com",
             home_page=None,
         )
 
-        author = service.create()
+        with self.captureOnCommitCallbacks(execute=True):
+            author = service.create()
 
-        invalidate_cache.assert_called_once_with(author.pk)
-
-    @patch("commenting.services.models.author.create.invalidate_comment_list_cache")
-    def test_create_service_invalidates_comment_list_cache(self, invalidate_cache):
-        service = CreateCommentAuthorService(
-            username="cachedauthor",
-            email="cached@example.com",
-            home_page=None,
+        event_sender_class.assert_called_once_with(author, Events.SAVE)
+        event_sender_class.return_value.send_event.assert_called_once_with(
+            {"id": author.pk}
         )
-
-        service.create()
-
-        invalidate_cache.assert_called_once_with()
 
     def test_create_service_rejects_duplicate_username(self):
         service = CreateCommentAuthorService(
@@ -759,17 +749,19 @@ class CommentAuthorServiceTests(TestCase):
         self.assertIsNone(service.obj.pk)
         self.assertEqual(CommentAuthor.objects.count(), 1)
 
-    @patch(
-        "commenting.services.models.author.create.invalidate_comment_author_cache"
-    )
-    def test_update_home_page_url_saves_author(self, invalidate_cache):
+    @patch("commenting.services.models.author.create.RedisEventSender")
+    def test_update_home_page_url_saves_author(self, event_sender_class):
         service = CommentAuthorService(self.author)
 
-        service.update_home_page_url("https://new.example.com")
+        with self.captureOnCommitCallbacks(execute=True):
+            service.update_home_page_url("https://new.example.com")
 
         self.author.refresh_from_db()
         self.assertEqual(self.author.home_page, "https://new.example.com")
-        invalidate_cache.assert_called_once_with(self.author.pk)
+        event_sender_class.assert_called_once_with(self.author, Events.SAVE)
+        event_sender_class.return_value.send_event.assert_called_once_with(
+            {"id": self.author.pk}
+        )
 
     def test_get_or_create_creates_author_when_missing(self):
         author = get_or_create(

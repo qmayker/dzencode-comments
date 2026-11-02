@@ -4,7 +4,8 @@ from abc import ABCMeta, abstractmethod
 from inspect import isabstract
 from typing import ClassVar
 
-from commenting.models import Comment
+from commenting.models import Comment, CommentAuthor
+from commenting.services.models.author.cache import invalidate_comment_author_cache
 from commenting.services.models.comment.cache import (
     invalidate_comment_list_cache,
     invalidate_comment_replies_cache,
@@ -69,6 +70,22 @@ class CommentCreatedReceiver(EventReceiver):
     model = Comment
 
     def handle_event(self, event: object) -> None:
+        invalidate_comment_list_cache()
+
+
+class CommentAuthorSavedReceiver(EventReceiver):
+    event_type = Events.SAVE
+    model = CommentAuthor
+
+    def handle_event(self, event: object) -> None:
+        if not isinstance(event, dict):
+            raise TypeError("Comment author event data must be a dictionary.")
+
+        author_id = event.get("id")
+        if not isinstance(author_id, int):
+            raise ValueError("Comment author event data must contain an integer id.")
+
+        invalidate_comment_author_cache(author_id)
         invalidate_comment_list_cache()
 
 
