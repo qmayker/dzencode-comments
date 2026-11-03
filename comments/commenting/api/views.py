@@ -32,9 +32,8 @@ type SerializedObject = dict[str, object]
 class CaptchaMixin:
     request: Request
 
-    def validate_captcha(self):
-        data = self.request.POST
-        serializer = CaptchaSerializer(data=data)
+    def validate_captcha(self) -> Response | None:
+        serializer = CaptchaSerializer(data=self.request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -43,7 +42,9 @@ class AuthorGetCreateView(CaptchaMixin, APIView):
     authentication_classes = [CommentAuthorAuthentication]
 
     def post(self, request: Request) -> Response:
-        self.validate_captcha()
+        captcha_response = self.validate_captcha()
+        if captcha_response is not None:
+            return captcha_response
         serializer = AuthorGetCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -81,7 +82,9 @@ class CommentCreateView(CaptchaMixin, APIView):
     # authentication_classes = [CommentAuthorAuthentication]
 
     def post(self, request: Request) -> Response:
-        self.validate_captcha()
+        captcha_response = self.validate_captcha()
+        if captcha_response is not None:
+            return captcha_response
         serializer = CommentCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

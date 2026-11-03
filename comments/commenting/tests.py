@@ -339,6 +339,7 @@ class CommentCreateApiTests(TestCase):
             data={
                 "username": "flowuser",
                 "email": "flow@example.com",
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -399,6 +400,28 @@ class CommentCreateApiTests(TestCase):
         self.assertIsNone(response.data["related_comment"])
         self.assertIsNone(response.data["target_comment"])
         self.assertEqual(Comment.objects.get().text, "API comment")
+
+    def test_post_rejects_invalid_captcha_without_creating_comment(self):
+        author = CommentAuthor.objects.create(
+            username="invalid-captcha-user",
+            email="invalid-captcha@example.com",
+        )
+        captcha = self.captcha_payload()
+        captcha["captcha_code"] = "invalid"
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "Should not be created",
+                **captcha,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
+        self.assertEqual(Comment.objects.count(), 0)
 
     @patch("commenting.api.views.WebSocketCommentEvents")
     def test_post_broadcasts_comment_to_page_room(self, socket_events):
@@ -806,12 +829,22 @@ class AuthorGetCreateApiTests(TestCase):
             email="existing@example.com",
         )
 
+    def captcha_payload(self):
+        from captcha.models import CaptchaStore
+
+        hashkey = CaptchaStore.generate_key()
+        return {
+            "captcha_code": CaptchaStore.objects.get(hashkey=hashkey).response,
+            "captcha_hashkey": hashkey,
+        }
+
     def test_post_returns_validation_error_for_email_used_by_another_author(self):
         response = self.client.post(
             self.url,
             data={
                 "username": "differentauthor",
                 "email": self.author.email,
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
@@ -826,12 +859,31 @@ class AuthorGetCreateApiTests(TestCase):
             data={
                 "username": self.author.username,
                 "email": "different@example.com",
+                **self.captcha_payload(),
             },
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("username", response.data)
+        self.assertEqual(CommentAuthor.objects.count(), 1)
+
+    def test_post_rejects_invalid_captcha_without_creating_author(self):
+        captcha = self.captcha_payload()
+        captcha["captcha_code"] = "invalid"
+
+        response = self.client.post(
+            self.url,
+            data={
+                "username": "invalidcaptcha",
+                "email": "invalid-captcha@example.com",
+                **captcha,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
         self.assertEqual(CommentAuthor.objects.count(), 1)
 
 
