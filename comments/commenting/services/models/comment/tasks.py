@@ -2,7 +2,6 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.mail import send_mail
-from django.core.mail.backends.console import EmailBackend
 
 logger = get_task_logger(__name__)
 
@@ -36,7 +35,6 @@ def send_reply_email(reply_id: int) -> int:
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[target.author.email],
-        connection=EmailBackend(),
         fail_silently=False,
     )
     return result

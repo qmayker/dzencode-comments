@@ -1,0 +1,10 @@
+.env
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+*.sqlite3
+comments/media
+comments/staticfiles
+certs

@@ -13,6 +13,10 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
+TRUE_VARIANTS = {"1", "true", "yes"}
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,13 +24,37 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-nzuzz%j!+3-xm(!(-lz7#7g9m593d)kw1qg_&2t4t1bc9bii=m"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+def is_true(value: str):
+    return value.lower() in TRUE_VARIANTS
 
-ALLOWED_HOSTS = []
+
+DEBUG = is_true(os.environ.get("DEBUG", "True"))
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is disabled.")
+    SECRET_KEY = "django-insecure-development-only"
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "False").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 
 # Application definition
@@ -81,8 +109,13 @@ WSGI_APPLICATION = "comments.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.sqlite3"),
+        "NAME": os.environ.get("DB_NAME", BASE_DIR / "db.sqlite3"),
+        "USER": os.environ.get("DB_USER", ""),
+        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+        "HOST": os.environ.get("DB_HOST", ""),
+        "PORT": os.environ.get("DB_PORT", ""),
+        "CONN_MAX_AGE": 60,
     }
 }
 
@@ -137,20 +170,16 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 
 # Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-    },
-}
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "webmaster@localhost"
 
 # Captcha
 
@@ -161,7 +190,7 @@ CAPTCHA_LENGTH = 6
 # Files
 
 
-TXT_FILE_SIZE = 1  # Кілобайти
+TXT_FILE_SIZE = 100  # Кілобайти
 IMAGE_FORMATS = ["jpg", "gif", "png"]
 
 # rest-framework
@@ -192,7 +221,7 @@ CHANNEL_LAYERS = {
 # Events
 
 EVENTS_REDIS_URL = os.environ.get(
-    "CHANNEL_REDIS_URL",
+    "EVENTS_REDIS_URL",
     "redis://127.0.0.1:6379/3",
 )
 

@@ -9,3 +9,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY comments/ /app/
+
+RUN addgroup --system app \
+    && adduser --system --ingroup app app \
+    && mkdir -p /app/media /app/staticfiles \
+    && chown -R app:app /app
+
+USER app
