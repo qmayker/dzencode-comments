@@ -12,7 +12,7 @@ COPY comments/ /app/
 
 RUN addgroup --system app \
     && adduser --system --ingroup app app \
-    && mkdir -p /app/media /app/staticfiles \
+    && mkdir -p /app/media /app/staticfiles /app/logs \
     && chown -R app:app /app
 
 USER app

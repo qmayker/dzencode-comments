@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import TypedDict
 
 import redis
@@ -6,6 +7,8 @@ import redis
 from .events import Events
 from .receivers import CommentCreatedReceiver, CommentReplyCreatedReceiver  # noqa: F401
 from .registry import ReceiverRegistry
+
+logger = logging.getLogger("comments")
 
 
 class EventData(TypedDict):
@@ -40,7 +43,11 @@ class RedisEventListener:
                 event_data["event"],
             )
             for receiver_class in receiver_classes:
-                print(event_data, receiver_class)
+                logger.debug(
+                    "Dispatching event %s to receiver %s",
+                    event_data,
+                    receiver_class.__name__,
+                )
                 receiver_class().handle_event(event_data["data"])
 
     def stop(self) -> None:

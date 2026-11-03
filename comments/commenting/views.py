@@ -1,4 +1,5 @@
 from enum import StrEnum
+from logging import getLogger
 
 from core.cache import CacheService
 from django.core.cache import cache
@@ -10,6 +11,8 @@ from commenting.models import Comment
 from commenting.services.models.comment.cache import CommentListCacheData
 
 from .enums import FileTypeEnum
+
+logger = getLogger("comments")
 
 
 class OrderingType(StrEnum):

@@ -33,6 +33,13 @@ starting Gunicorn. Daphne, Nginx, Celery, and the event listener start after the
 web service is healthy. Only Nginx publishes a host port; PostgreSQL and Redis
 are accessible only on the private Compose network.
 
+Application logs from `logging.getLogger("comments")` are written to the console
+at INFO level. When Django `DEBUG=True`, DEBUG-and-higher messages are also
+written to separate files in the persistent `logs` volume: `web.log`,
+`daphne.log`, `celery.log`, and `events.log`. Django and other framework logs
+are discarded. For example, inspect the event listener log with
+`docker compose exec events tail -f /app/logs/events.log`.
+
 This stack initializes a new PostgreSQL database; `migrate` creates its schema
 but does not copy data from the development SQLite database. If existing
 comments or uploaded files must be kept, migrate the database and copy the
@@ -62,8 +69,8 @@ certificate are stored in the ignored `certs/` directory. To replace them, run
 
 ## Persistent data
 
-Back up the `postgres_data` and `media` Docker volumes. Uploaded files are
-stored in `media` and served directly by Nginx; collected application assets
+Back up the `postgres_data`, `media`, and `logs` Docker volumes. Uploaded files
+are stored in `media` and served directly by Nginx; collected application assets
 are stored separately in `staticfiles` and can be recreated by running
 `docker compose restart web`. Redis data is persisted in `redis_data`; it is
 runtime state and does not replace database or media backups.

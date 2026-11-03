@@ -1,3 +1,5 @@
+from logging import getLogger
+
 from api.authentication import CommentAuthorAuthentication
 from captcha.serializers import CaptchaSerializer
 from commenting.models import Comment, CommentAuthor
@@ -25,6 +27,8 @@ from .serializers import (
     CommentRepliesQuerySerializer,
     CommentReplySerializer,
 )
+
+logger = getLogger("comments")
 
 type SerializedObject = dict[str, object]
 

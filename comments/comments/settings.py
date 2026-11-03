@@ -134,6 +134,7 @@ CELERY_BROKER_URL = os.environ.get(
     "redis://127.0.0.1:6379/0",
 )
 CELERY_IMPORTS = ("commenting.services.models.comment.tasks",)
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
 
 # Password validation
@@ -175,6 +176,54 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+LOG_FILE = Path(os.environ.get("LOG_FILE", BASE_DIR / "logs" / "app.log"))
+LOGGING_HANDLERS = {
+    "console": {
+        "class": "logging.StreamHandler",
+        "formatter": "verbose",
+        "level": "INFO",
+    },
+    "discard": {
+        "class": "logging.NullHandler",
+    },
+}
+if DEBUG:
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    LOGGING_HANDLERS["file"] = {
+        "class": "logging.FileHandler",
+        "filename": str(LOG_FILE),
+        "encoding": "utf-8",
+        "formatter": "verbose",
+        "level": "DEBUG",
+    }
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": True,
+    "formatters": {
+        "verbose": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(process)d %(message)s",
+        },
+    },
+    "handlers": LOGGING_HANDLERS,
+    "root": {
+        "handlers": ["discard"],
+        "level": "DEBUG",
+    },
+    "loggers": {
+        "comments": {
+            "handlers": ["console"] + (["file"] if DEBUG else []),
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "django": {
+            "handlers": ["discard"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+}
 
 
 # Email
