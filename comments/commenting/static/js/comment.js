@@ -81,14 +81,21 @@ async function createComment({
   targetCommentId = null,
   relatedCommentId = null,
 }) {
+  const authorChanged =
+    storedAuthor &&
+    (username !== storedAuthor.username ||
+      email !== storedAuthor.email ||
+      (homePage || null) !== (storedAuthor.home_page || null));
+  const needsAuthor = !storedAuthor || authorChanged;
+
   const { captcha_token: captchaToken } = await postJson(captchaUrl, {
     captcha_code: captchaCode,
     captcha_hashkey: captchaHashkey,
-    methods: storedAuthor ? "comment_create" : "author_get_create;comment_create",
+    methods: needsAuthor ? "author_get_create;comment_create" : "comment_create",
   });
 
   let author = storedAuthor;
-  if (!author) {
+  if (needsAuthor) {
     author = await postJson(authorUrl, {
       username,
       email,
