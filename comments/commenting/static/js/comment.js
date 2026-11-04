@@ -76,16 +76,24 @@ async function createComment({
   text,
   captchaCode,
   captchaHashkey,
+  captchaUrl = window.captchaVerifyUrl,
   additionalFile,
   targetCommentId = null,
   relatedCommentId = null,
 }) {
+  const { captcha_token: captchaToken } = await postJson(captchaUrl, {
+    captcha_code: captchaCode,
+    captcha_hashkey: captchaHashkey,
+    methods: storedAuthor ? "comment_create" : "author_get_create;comment_create",
+  });
+
   let author = storedAuthor;
   if (!author) {
     author = await postJson(authorUrl, {
       username,
       email,
       home_page: homePage || null,
+      captcha_token: captchaToken,
     });
     localStorage.setItem("comment_token", author.token);
   }
@@ -93,8 +101,7 @@ async function createComment({
   const commentData = new FormData();
   commentData.set("author", author.id);
   commentData.set("text", text);
-  commentData.set("captcha_0", captchaHashkey);
-  commentData.set("captcha_1", captchaCode);
+  commentData.set("captcha_token", captchaToken);
   if (targetCommentId) {
     commentData.set("target_comment", targetCommentId);
   }

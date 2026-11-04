@@ -1,7 +1,7 @@
+import secrets
 from logging import getLogger
 
 from api.authentication import CommentAuthorAuthentication
-from captcha.serializers import CaptchaSerializer
 from commenting.models import Comment, CommentAuthor
 from commenting.services.models.author.cache import CommentAuthorCacheData
 from commenting.services.models.author.operations import get_or_create
@@ -12,6 +12,7 @@ from commenting.services.models.comment.create import (
 )
 from commenting.services.models.comment.socket import WebSocketCommentEvents
 from core.cache import CacheService
+from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import status
 from rest_framework.exceptions import ValidationError as APIValidationError
@@ -23,6 +24,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from .serializers import (
     AuthorGetCreateSerializer,
+    CaptchaValidateSerializer,
     CommentCreateSerializer,
     CommentRepliesQuerySerializer,
     CommentReplySerializer,
@@ -33,16 +35,52 @@ logger = getLogger("comments")
 type SerializedObject = dict[str, object]
 
 
-class CaptchaMixin:
-    request: Request
+CAPTCHA_PASS_TTL = 300
+CAPTCHA_PASS_KEY = "captcha_pass:{}"
 
-    def validate_captcha(self) -> Response | None:
-        serializer = CaptchaSerializer(data=self.request.data)
+
+class CaptchaVerifyView(APIView):
+    authentication_classes: list[type] = []
+
+    def post(self, request: Request) -> Response:
+        serializer = CaptchaValidateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        token = secrets.token_urlsafe(32)
+        cache.set(
+            CAPTCHA_PASS_KEY.format(token),
+            serializer.validated_data["methods"],
+            CAPTCHA_PASS_TTL,
+        )
+        return Response({"captcha_token": token}, status=status.HTTP_200_OK)
+
+
+class CaptchaMixin:
+    request: Request
+    captcha_method: str
+
+    def validate_captcha(self) -> Response | None:
+        token = self.request.data.get("captcha_token")
+        key = CAPTCHA_PASS_KEY.format(token)
+        methods: list[str] = cache.get(key) if isinstance(token, str) else None
+        if not methods or self.captcha_method not in methods:
+            return Response(
+                {"captcha_token": ["Invalid or expired CAPTCHA token."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            methods.remove(self.captcha_method)
+        except ValueError:
+            return Response({"captcha_token": "No access to this endpoint"})
+        if methods:
+            cache.set(key, methods, CAPTCHA_PASS_TTL)
+        else:
+            cache.delete(key)
+        return None
 
 
 class AuthorGetCreateView(CaptchaMixin, APIView):
+    captcha_method = "author_get_create"
     authentication_classes = [CommentAuthorAuthentication]
 
     def post(self, request: Request) -> Response:
@@ -82,6 +120,7 @@ class AuthorGetCreateView(CaptchaMixin, APIView):
 
 
 class CommentCreateView(CaptchaMixin, APIView):
+    captcha_method = "comment_create"
     # permission_classes = [IsAuthenticated]
     # authentication_classes = [CommentAuthorAuthentication]
 

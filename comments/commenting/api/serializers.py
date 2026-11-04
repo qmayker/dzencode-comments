@@ -1,3 +1,4 @@
+from captcha.serializers import CaptchaSerializer
 from commenting.models import Comment, CommentAuthor
 from commenting.validators import UserNameValidator
 from rest_framework import serializers
@@ -85,3 +86,13 @@ class CommentRepliesQuerySerializer(serializers.Serializer):
         source="comment",
         queryset=Comment.objects.all(),
     )
+
+
+class CaptchaValidateSerializer(CaptchaSerializer):
+    methods = serializers.CharField(write_only=True)
+
+    def validate_methods(self, value: str) -> list[str]:
+        methods = [method.strip() for method in value.split(";") if method.strip()]
+        if not methods:
+            raise serializers.ValidationError("At least one method is required.")
+        return methods

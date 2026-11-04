@@ -323,13 +323,13 @@ class CommentCreateApiTests(TestCase):
     url = "/api/commenting/comments/"
 
     def captcha_payload(self):
-        from captcha.models import CaptchaStore
+        from django.core.cache import cache
 
-        hashkey = CaptchaStore.generate_key()
-        return {
-            "captcha_code": CaptchaStore.objects.get(hashkey=hashkey).response,
-            "captcha_hashkey": hashkey,
-        }
+        token = "valid-test-token"
+        cache.set(
+            f"captcha_pass:{token}", ["author_get_create", "comment_create"], 300
+        )
+        return {"captcha_token": token}
 
     def test_author_response_can_be_used_to_create_comment(self):
         from rest_framework_simplejwt.tokens import AccessToken
@@ -407,7 +407,7 @@ class CommentCreateApiTests(TestCase):
             email="invalid-captcha@example.com",
         )
         captcha = self.captcha_payload()
-        captcha["captcha_code"] = "invalid"
+        captcha["captcha_token"] = "invalid"
 
         response = self.client.post(
             self.url,
@@ -420,7 +420,7 @@ class CommentCreateApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("error", response.data)
+        self.assertIn("captcha_token", response.data)
         self.assertEqual(Comment.objects.count(), 0)
 
     @patch("commenting.api.views.WebSocketCommentEvents")
@@ -830,13 +830,13 @@ class AuthorGetCreateApiTests(TestCase):
         )
 
     def captcha_payload(self):
-        from captcha.models import CaptchaStore
+        from django.core.cache import cache
 
-        hashkey = CaptchaStore.generate_key()
-        return {
-            "captcha_code": CaptchaStore.objects.get(hashkey=hashkey).response,
-            "captcha_hashkey": hashkey,
-        }
+        token = "valid-test-token"
+        cache.set(
+            f"captcha_pass:{token}", ["author_get_create", "comment_create"], 300
+        )
+        return {"captcha_token": token}
 
     def test_post_returns_validation_error_for_email_used_by_another_author(self):
         response = self.client.post(
@@ -870,7 +870,7 @@ class AuthorGetCreateApiTests(TestCase):
 
     def test_post_rejects_invalid_captcha_without_creating_author(self):
         captcha = self.captcha_payload()
-        captcha["captcha_code"] = "invalid"
+        captcha["captcha_token"] = "invalid"
 
         response = self.client.post(
             self.url,
@@ -883,8 +883,103 @@ class AuthorGetCreateApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("error", response.data)
+        self.assertIn("captcha_token", response.data)
         self.assertEqual(CommentAuthor.objects.count(), 1)
+
+    def test_author_post_removes_only_used_method_from_captcha_token(self):
+        captcha = self.captcha_payload()
+        data = {"username": "newauthor", "email": "new@example.com", **captcha}
+
+        response = self.client.post(
+            self.url, data=data, content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        from django.core.cache import cache
+
+        self.assertEqual(
+            cache.get("captcha_pass:valid-test-token"), ["comment_create"]
+        )
+
+        repeat = self.client.post(self.url, data=data, content_type="application/json")
+        self.assertEqual(repeat.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("captcha_token", repeat.data)
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
+class CaptchaVerifyApiTests(TestCase):
+    url = "/api/commenting/captcha/verify/"
+
+    def test_valid_captcha_returns_token(self):
+        from captcha.models import CaptchaStore
+
+        hashkey = CaptchaStore.generate_key()
+        response = self.client.post(
+            self.url,
+            data={
+                "captcha_code": CaptchaStore.objects.get(hashkey=hashkey).response,
+                "captcha_hashkey": hashkey,
+                "methods": "author_get_create; comment_create;",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        from django.core.cache import cache
+
+        token = response.data["captcha_token"]
+        self.assertEqual(
+            cache.get(f"captcha_pass:{token}"), ["author_get_create", "comment_create"]
+        )
+
+    def test_missing_methods_is_rejected(self):
+        from captcha.models import CaptchaStore
+
+        hashkey = CaptchaStore.generate_key()
+        response = self.client.post(
+            self.url,
+            data={
+                "captcha_code": CaptchaStore.objects.get(hashkey=hashkey).response,
+                "captcha_hashkey": hashkey,
+                "methods": " ; ",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("methods", response.data)
+
+    def test_token_is_rejected_for_method_not_in_list(self):
+        from django.core.cache import cache
+
+        cache.set("captcha_pass:only-author", ["author_get_create"], 300)
+        response = self.client.post(
+            "/api/commenting/comments/",
+            data={"author": 1, "text": "x", "captcha_token": "only-author"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("captcha_token", response.data)
+
+    def test_invalid_captcha_is_rejected(self):
+        from captcha.models import CaptchaStore
+
+        hashkey = CaptchaStore.generate_key()
+        response = self.client.post(
+            self.url,
+            data={
+                "captcha_code": "invalid",
+                "captcha_hashkey": hashkey,
+                "methods": "comment_create",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotIn("captcha_token", response.data)
 
 
 @override_settings(
