@@ -19,6 +19,11 @@ class AuthorGetCreateSerializer(ModelSerializer):
 class CommentCreateSerializer(ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     author_username = serializers.CharField(source="author.username", read_only=True)
+    author_home_page = serializers.URLField(
+        source="author.home_page",
+        read_only=True,
+        allow_null=True,
+    )
     target_comment_username = serializers.CharField(
         source="target_comment.author.username",
         read_only=True,
@@ -36,6 +41,7 @@ class CommentCreateSerializer(ModelSerializer):
             "additional_file",
             "file_type",
             "author_username",
+            "author_home_page",
             "target_comment_username",
         ]
 
@@ -59,6 +65,11 @@ class CommentCreateSerializer(ModelSerializer):
 
 class CommentReplySerializer(ModelSerializer):
     author_username = serializers.CharField(source="author.username", read_only=True)
+    author_home_page = serializers.URLField(
+        source="author.home_page",
+        read_only=True,
+        allow_null=True,
+    )
     target_comment_username = serializers.CharField(
         source="target_comment.author.username",
         read_only=True,
@@ -76,6 +87,7 @@ class CommentReplySerializer(ModelSerializer):
             "additional_file",
             "file_type",
             "author_username",
+            "author_home_page",
             "target_comment_username",
             "created_at",
         ]

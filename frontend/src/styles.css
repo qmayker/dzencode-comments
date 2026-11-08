@@ -293,6 +293,10 @@ h1 {
   font-size: 1rem;
 }
 
+.comment-author a {
+  color: inherit;
+}
+
 .comment-date {
   color: #7b8495;
   font-size: 0.82rem;

@@ -56,7 +56,12 @@ function openImage(event) {
 <template>
   <article :class="['comment', { 'comment-reply': isReply }]" :data-comment-id="comment.id">
     <header class="comment-header">
-      <strong class="comment-author">{{ comment.author_username }}</strong>
+      <strong class="comment-author">
+        <a v-if="comment.author_home_page" :href="comment.author_home_page">
+          {{ comment.author_username }}
+        </a>
+        <template v-else>{{ comment.author_username }}</template>
+      </strong>
       <time v-if="dateText" class="comment-date" :datetime="comment.created_at">
         {{ dateText }}
       </time>

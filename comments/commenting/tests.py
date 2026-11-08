@@ -384,6 +384,7 @@ class CommentCreateApiTests(TestCase):
         author = CommentAuthor.objects.create(
             username="apiuser",
             email="api@example.com",
+            home_page="https://example.com/apiuser",
         )
 
         response = self.client.post(
@@ -399,6 +400,10 @@ class CommentCreateApiTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(response.data["author"], author.pk)
+        self.assertEqual(
+            response.data["author_home_page"],
+            "https://example.com/apiuser",
+        )
         self.assertIsNone(response.data["related_comment"])
         self.assertIsNone(response.data["target_comment"])
         self.assertEqual(Comment.objects.get().text, "API comment")
@@ -622,6 +627,7 @@ class CommentRepliesApiTests(TestCase):
         self.author = CommentAuthor.objects.create(
             username="replies-api-author",
             email="replies-api@example.com",
+            home_page="https://example.com/replies-api-author",
         )
         self.comment = Comment.objects.create(
             author=self.author,
@@ -654,6 +660,10 @@ class CommentRepliesApiTests(TestCase):
         self.assertEqual(response.data[0]["text"], "Reply")
         self.assertEqual(response.data[0]["author"], self.author.pk)
         self.assertEqual(response.data[0]["author_username"], self.author.username)
+        self.assertEqual(
+            response.data[0]["author_home_page"],
+            self.author.home_page,
+        )
         self.assertEqual(
             response.data[0]["target_comment_username"],
             self.author.username,
@@ -1222,6 +1232,17 @@ class CommentListViewTests(TestCase):
         self.assertEqual(comments[parent.pk]["reply_count"], 1)
         self.assertEqual(
             sum(comment["reply_count"] for comment in comments.values()), 1
+        )
+
+    def test_frontend_config_includes_author_home_page(self):
+        self.author.home_page = "https://example.com/list-author"
+        self.author.save(update_fields=["home_page"])
+
+        config = self._config(self.client.get("/"))
+
+        self.assertEqual(
+            config["comments"][0]["author_home_page"],
+            self.author.home_page,
         )
 
     def test_captcha_refresh_endpoint_returns_image_and_key(self):

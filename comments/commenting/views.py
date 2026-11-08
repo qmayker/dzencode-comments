@@ -95,6 +95,7 @@ class CommentListView(ListView):
         return {
             "id": comment.pk,
             "author_username": comment.author.username,
+            "author_home_page": comment.author.home_page,
             "created_at": comment.created_at.isoformat(),
             "text": comment.text,
             "related_comment": comment.related_comment_id,
