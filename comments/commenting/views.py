@@ -4,13 +4,12 @@ from logging import getLogger
 from core.cache import CacheService
 from django.core.cache import cache
 from django.db.models import QuerySet
+from django.urls import reverse
 from django.views.generic import ListView
 
-from commenting.forms import CommentCreateForm
 from commenting.models import Comment
 from commenting.services.models.comment.cache import CommentListCacheData
-
-from .enums import FileTypeEnum
+from commenting.validators import FileFormatData
 
 logger = getLogger("comments")
 
@@ -92,9 +91,52 @@ class CommentListView(ListView):
             return super().get_ordering()
         return [ordering]
 
+    def _serialize_comment(self, comment: Comment) -> dict:
+        return {
+            "id": comment.pk,
+            "author_username": comment.author.username,
+            "created_at": comment.created_at.isoformat(),
+            "text": comment.text,
+            "related_comment": comment.related_comment_id,
+            "target_comment": comment.target_comment_id,
+            "target_comment_username": None,
+            "additional_file": (
+                comment.additional_file.url if comment.additional_file else None
+            ),
+            "file_type": comment.file_type or None,
+            "reply_count": len(comment.replies.all()),
+        }
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["comment_form"] = CommentCreateForm()
-        context["comment_reply_form"] = CommentCreateForm(auto_id="reply_%s")
-        context["file_type_enum"] = FileTypeEnum
+        page = context["page_obj"] if context.get("is_paginated") else None
+        field = self.request.GET.get("field")
+        ordering_type = self.request.GET.get("orderingType")
+        if self._get_ordering(field, ordering_type) is None:
+            field, ordering_type = "created", "desc"
+
+        context["frontend_config"] = {
+            "urls": {
+                "captchaVerify": reverse("api:commenting:captcha-verify"),
+                "authorGetCreate": reverse("api:commenting:author-get-create"),
+                "authorGet": reverse("api:commenting:author-get"),
+                "commentCreate": reverse("api:commenting:comment-create"),
+                "commentReplies": reverse("api:commenting:comment-replies"),
+                "captchaRefresh": reverse("captcha-refresh"),
+            },
+            "acceptedFileExtensions": ",".join(
+                f".{extension}"
+                for extension in sorted(FileFormatData.get_all_formats().all_formats)
+            ),
+            "sort": {"field": field, "orderingType": ordering_type},
+            "pagination": {
+                "number": page.number if page else 1,
+                "num_pages": page.paginator.num_pages if page else 1,
+                "has_previous": page.has_previous() if page else False,
+                "has_next": page.has_next() if page else False,
+            },
+            "comments": [
+                self._serialize_comment(comment) for comment in context["comment_list"]
+            ],
+        }
         return context

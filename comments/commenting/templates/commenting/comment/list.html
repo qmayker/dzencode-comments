@@ -1,94 +1,14 @@
-{% load static %}
+{% load vite %}
 <!DOCTYPE html>
 <html lang="uk">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Коментарі</title>
-    <link rel="stylesheet" href="{% static 'commenting/comment_list.css' %}">
-    <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.12.0/css/lightbox.min.css"
-    >
+    {% vite_assets %}
   </head>
   <body>
-    <main class="page">
-      <header class="page-header">
-        <p class="eyebrow">Обговорення</p>
-        <h1>Коментарі</h1>
-      </header>
-
-      {% include "commenting/comment/_create_form.html" with form=comment_form title="Залишити коментар" form_class="" title_id="comment-create-title" form_id="comment-create-form" status_id="comment-form-status" %}
-      <div id="comment-reply-storage" hidden>
-        {% include "commenting/comment/_create_form.html" with form=comment_reply_form title="Відповісти на коментар" form_class="comment-reply-form" title_id="comment-reply-title" form_id="comment-reply-form" status_id="comment-reply-status" %}
-      </div>
-
-      <div id="new-comments-container" class="new-comments" hidden>
-        <button id="new-comments-button" type="button">
-          Переглянути нові коментарі (0)
-        </button>
-      </div>
-
-      <form class="sort-form" method="get">
-        <label for="field">Сортувати за</label>
-        <select id="field" name="field">
-          <option value="created"{% if request.GET.field == "created" or not request.GET.field %} selected{% endif %}>Датою створення</option>
-          <option value="username"{% if request.GET.field == "username" %} selected{% endif %}>Ім'ям автора</option>
-          <option value="email"{% if request.GET.field == "email" %} selected{% endif %}>Електронною поштою</option>
-        </select>
-        <select name="orderingType" aria-label="Напрямок сортування">
-          <option value="desc"{% if request.GET.orderingType == "desc" or not request.GET.orderingType %} selected{% endif %}>За спаданням</option>
-          <option value="asc"{% if request.GET.orderingType == "asc" %} selected{% endif %}>За зростанням</option>
-        </select>
-        <button type="submit">Застосувати</button>
-      </form>
-
-      <section class="comment-list" aria-label="Список коментарів">
-        {% for comment in comment_list %}
-          {% include 'commenting/comment/comment.html' %}
-        {% empty %}
-          <p class="empty-state">Коментарів поки немає.</p>
-        {% endfor %}
-      </section>
-
-      <dialog class="text-file-dialog" id="text-file-dialog" aria-labelledby="text-file-title">
-        <div class="text-file-dialog-content">
-          <header class="text-file-dialog-header">
-            <h2 id="text-file-title">Текстовий файл</h2>
-            <button type="button" class="text-file-dialog-close" aria-label="Закрити">×</button>
-          </header>
-          <p class="text-file-dialog-status" role="status" aria-live="polite"></p>
-          <pre class="text-file-dialog-body"></pre>
-        </div>
-      </dialog>
-
-      {% if is_paginated %}
-        <nav class="pagination" aria-label="Сторінки коментарів">
-          {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}&field={{ request.GET.field|default:'created'|urlencode }}&orderingType={{ request.GET.orderingType|default:'desc'|urlencode }}">Попередня</a>
-          {% endif %}
-
-          <span class="page-count">Сторінка {{ page_obj.number }} з {{ page_obj.paginator.num_pages }}</span>
-
-          {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}&field={{ request.GET.field|default:'created'|urlencode }}&orderingType={{ request.GET.orderingType|default:'desc'|urlencode }}">Наступна</a>
-          {% endif %}
-        </nav>
-      {% endif %}
-    </main>
-    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.8/dist/js.cookie.min.js"></script>
-    <script>
-      window.captchaVerifyUrl = "{% url 'api:commenting:captcha-verify' %}";
-      window.authorGetCreateUrl = "{% url 'api:commenting:author-get-create' %}";
-      window.authorGetUrl = "{% url 'api:commenting:author-get' %}";
-      window.commentCreateUrl = "{% url 'api:commenting:comment-create' %}";
-      window.commentRepliesUrl = "{% url 'api:commenting:comment-replies' %}";
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.12.0/js/lightbox-plus-jquery.min.js"></script>
-    <script src="{% static 'js/tags.js' %}"></script>
-    <script src="{% static 'js/captcha.js' %}"></script>
-    <script src="{% static 'js/txt.js' %}"></script>
-    <script src="{% static 'js/comment.js' %}"></script>
-    <script src="{% static 'js/sockets.js' %}"></script>
+    <div id="app"></div>
+    {{ frontend_config|json_script:"app-config" }}
   </body>
 </html>

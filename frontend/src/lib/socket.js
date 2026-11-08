@@ -1,4 +1,9 @@
-document.addEventListener("DOMContentLoaded", () => {
+const EVENT_HANDLERS = {
+  "comment.created": "onCommentCreated",
+  "reply.created": "onReplyCreated",
+};
+
+export function connectCommentSocket(handlers) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const socket = new WebSocket(
     `${protocol}//${window.location.host}/ws/comments/`,
@@ -13,27 +18,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (!message.comment) {
-      return;
+    const handlerName = EVENT_HANDLERS[message.type];
+    if (message.comment && handlerName) {
+      handlers[handlerName]?.(message.comment);
     }
-
-    const eventNames = {
-      "comment.created": "comment-created",
-      "reply.created": "reply-created",
-    };
-    const eventName = eventNames[message.type];
-    if (!eventName) {
-      return;
-    }
-
-    window.dispatchEvent(
-      new CustomEvent(eventName, { detail: message.comment }),
-    );
   });
 
   socket.addEventListener("error", (error) => {
     console.error("Comment WebSocket connection failed.", error);
   });
 
-  window.commentSocket = socket;
-});
+  return socket;
+}

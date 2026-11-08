@@ -8,16 +8,19 @@ Celery, and the event listener.
 
 ## Configure and start
 
-1. Copy `.env.example` to `.env`. Set `SECRET_KEY` to a new random value (for
-   example, run `python -c "import secrets; print(secrets.token_urlsafe(64))"`)
-   and set `DB_PASSWORD` to a strong database password. Set `ALLOWED_HOSTS` to
-   the public hostnames and `CSRF_TRUSTED_ORIGINS` to their full origins,
+1. Copy `.env.example` to `.env`. The example values and Compose defaults are
+   for local HTTP testing only. For a public deployment, set `DEBUG=False`,
+   `SECRET_KEY` to a new random value (for example, run
+   `python -c "import secrets; print(secrets.token_urlsafe(64))"`), and
+   `DB_PASSWORD` to a strong database password. Set `ALLOWED_HOSTS` to the
+   public hostnames and `CSRF_TRUSTED_ORIGINS` to their full origins,
    including `https://` when using HTTPS. Keep `.env` private.
 2. Terminate HTTPS at a trusted proxy in front of this stack and configure that
    proxy to redirect HTTP traffic to HTTPS. The included Nginx listener is
    HTTP-only and forwards the `X-Forwarded-Proto` value received from that proxy.
-   Keep `SECURE_SSL_REDIRECT=True` and `SECURE_HSTS_SECONDS` enabled so Django
-   also enforces HTTPS when it sees the trusted proxy's forwarded scheme.
+   Set `SECURE_SSL_REDIRECT=True` and `SECURE_HSTS_SECONDS=31536000` in `.env`
+   only after HTTPS is working, so Django also enforces HTTPS when it sees the
+   trusted proxy's forwarded scheme.
    Production session and CSRF cookies are marked secure. Restrict access to
    `HTTP_PORT` (default 80) so clients can reach it only through the trusted proxy.
 3. Reply notification emails use Django's console backend and are written to
@@ -28,10 +31,12 @@ Celery, and the event listener.
    docker compose up --build -d
    ```
 
-The web container applies database migrations and collects static files before
-starting Gunicorn. Daphne, Nginx, Celery, and the event listener start after the
-web service is healthy. Only Nginx publishes a host port; PostgreSQL and Redis
-are accessible only on the private Compose network.
+The Docker build compiles the Vue frontend and includes it in the application
+image. On startup, the web container applies database migrations and collects
+static files before starting Gunicorn. Daphne, Nginx, Celery, and the event
+listener start after the web service is healthy. Only Nginx publishes the
+application port; PostgreSQL and Redis are accessible only on the private
+Compose network (Redis is also bound to host loopback for local development).
 
 Application logs from `logging.getLogger("comments")` are written to the console
 at INFO level. When Django `DEBUG=True`, DEBUG-and-higher messages are also

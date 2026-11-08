@@ -5,3 +5,4 @@ comments/media/
 comments/logs/
 .env
 certs/
+node_modules/

@@ -2,7 +2,7 @@
 
 Веб-приложение для обсуждений: список комментариев с вложенными ответами,
 CAPTCHA, загрузкой файлов, обновлениями в реальном времени и уведомлениями об
-ответах. Написано на Django 6 + Django REST Framework (тестовое задание).
+ответах. Backend написан на Django 6 + Django REST Framework, интерфейс — на Vue.
 
 ## Возможности
 
@@ -83,6 +83,8 @@ comments/
   events/      отправка и обработка событий через Redis
   core/        общий кеш, валидаторы, базовые модели
   api/         JWT-аутентификация и корневые API-маршруты
+frontend/
+  src/         Vue-интерфейс и компоненты
 nginx/         конфигурация Nginx
 scripts/       генерация локального TLS-сертификата
 ```
@@ -91,18 +93,43 @@ scripts/       генерация локального TLS-сертификат�
 
 ### Docker Compose (рекомендуется)
 
+Требуются Docker Engine и Docker Compose. Для локального запуска достаточно:
+
 ```sh
-cp .env.example .env   # задайте SECRET_KEY и DB_PASSWORD
-docker compose up --build -d
+docker compose up --build
+```
+
+Команда собирает Vue-интерфейс и Docker-образы, создаёт таблицы и запускает
+веб-сервер, WebSocket, PostgreSQL, Redis, Celery и обработчик событий.
+Откройте [http://localhost](http://localhost) (порт можно изменить через
+`HTTP_PORT`). Для запуска в фоне используйте `docker compose up --build -d`,
+затем `docker compose ps` для проверки состояния. Создание администратора
+необязательно:
+
+```sh
 docker compose exec web python manage.py createsuperuser
 ```
 
-Приложение будет доступно на порту `HTTP_PORT` (по умолчанию 80). Подробнее о
-развёртывании, HTTPS и томах — в [DEPLOYMENT.md](DEPLOYMENT.md).
+Для локальной разработки можно скопировать `.env.example` в `.env` и изменить
+порт или параметры подключения. Значения по умолчанию в Compose предназначены
+только для локального запуска и не подходят для публичного сервера. Настройка
+production и локального HTTPS описана в [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Локально
 
-Нужны Python 3.14 и запущенный Redis (`127.0.0.1:6379`).
+Для запуска Django вне Docker нужны Python 3.14, Node.js 22.12+ и Redis,
+доступный на `127.0.0.1:6379`. Этот вариант предназначен для разработки
+backend; для полного сценария с WebSocket используйте Docker Compose.
+Сначала соберите интерфейс:
+
+```sh
+cd frontend
+npm ci
+npm run build
+cd ..
+```
+
+Затем запустите backend из отдельных терминалов:
 
 ```sh
 python -m venv venv
@@ -110,13 +137,24 @@ venv\Scripts\activate            # Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
 cd comments
 python manage.py migrate
-python manage.py runserver       # WebSocket: daphne comments.asgi:application
+python manage.py runserver
+```
+
+Для очередей и обработки событий запустите ещё два процесса из каталога
+`comments`:
+
+```sh
 celery -A comments worker -l info
 python manage.py listen_events
 ```
 
-Чтобы Redis из Compose был доступен с компьютера, опубликуйте порт только на
-loopback: `127.0.0.1:6379:6379`.
+Локальный Redis можно запустить через Compose:
+
+```sh
+docker compose up -d redis
+```
+
+Его порт опубликован только на loopback-интерфейсе.
 
 ## Тесты
 

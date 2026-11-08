@@ -174,6 +174,9 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Vite build output (see frontend/); set VITE_DEV_SERVER_URL to use the dev server.
+VITE_DIST_DIR = BASE_DIR / "commenting" / "static" / "commenting" / "dist"
+VITE_DEV_SERVER_URL = os.environ.get("VITE_DEV_SERVER_URL", "")
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

@@ -1,4 +1,6 @@
 from io import BytesIO
+import json
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -1044,6 +1046,20 @@ class CommentWebSocketTests(SimpleTestCase):
 class CommentListViewTests(TestCase):
     def setUp(self):
         cache.clear()
+        dist_dir = Path(self.enterContext(TemporaryDirectory()))
+        (dist_dir / ".vite").mkdir()
+        (dist_dir / ".vite" / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "src/main.js": {
+                        "file": "assets/main-test.js",
+                        "css": ["assets/main-test.css"],
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.enterContext(override_settings(VITE_DIST_DIR=dist_dir))
         self.author = CommentAuthor.objects.create(
             username="list-author",
             email="list@example.com",
@@ -1063,10 +1079,18 @@ class CommentListViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["comment_list"]), 25)
-        self.assertContains(response, 'id="comment-create-form"')
-        self.assertContains(response, 'id="new-comments-container"')
-        self.assertContains(response, "Переглянути нові коментарі (0)")
-        self.assertContains(response, "Наступна")
+        self.assertContains(response, 'id="app"')
+        self.assertEqual(len(self._config(response)["comments"]), 25)
+        self.assertEqual(self._config(response)["pagination"]["has_next"], True)
+
+    def _config(self, response):
+        match = re.search(
+            r'<script id="app-config" type="application/json">(.*?)</script>',
+            response.content.decode(),
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        return json.loads(match.group(1))
 
     def test_comment_list_uses_cached_models(self):
         self.client.get("/")
@@ -1145,39 +1169,62 @@ class CommentListViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["comment_list"]), 25)
 
-    def test_comment_create_form_is_displayed_before_sort_form(self):
+    def test_page_loads_vite_assets_without_cdn(self):
         response = self.client.get("/")
 
-        self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertLess(
-            content.index('id="comment-create-form"'),
-            content.index('class="sort-form"'),
-        )
-
-    def test_reply_form_is_rendered_once_inside_hidden_storage(self):
-        response = self.client.get("/")
-
         self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-        self.assertContains(response, "window.authorGetUrl")
-        self.assertEqual(content.count('id="comment-reply-form"'), 1)
         self.assertIn(
-            '<div id="comment-reply-storage" hidden>',
+            '<script type="module" src="/static/commenting/dist/assets/main-test.js">',
             content,
         )
-        self.assertIn('id="reply_username"', content)
+        self.assertIn(
+            '<link rel="stylesheet" href="/static/commenting/dist/assets/main-test.css">',
+            content,
+        )
+        self.assertNotIn("cdn", content.lower())
+        self.assertNotIn("https://", content)
 
-    def test_comment_forms_include_captcha_fields(self):
-        response = self.client.get("/")
+    def test_frontend_config_describes_api_urls_and_formats(self):
+        config = self._config(self.client.get("/"))
 
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-        self.assertEqual(content.count('name="captcha_0"'), 2)
-        self.assertEqual(content.count('name="captcha_1"'), 2)
-        self.assertEqual(content.count('class="js-captcha-refresh"'), 2)
-        self.assertContains(response, "js/captcha.js")
+        self.assertEqual(config["urls"]["captchaRefresh"], "/captcha/refresh/")
+        self.assertEqual(
+            config["urls"]["commentReplies"], "/api/commenting/comments/replies/"
+        )
+        self.assertEqual(config["acceptedFileExtensions"], ".gif,.jpg,.png,.txt")
+        self.assertEqual(
+            config["sort"], {"field": "created", "orderingType": "desc"}
+        )
 
+    def test_frontend_config_uses_requested_sort(self):
+        response = self.client.get("/", {"field": "username", "orderingType": "asc"})
+
+        self.assertEqual(
+            self._config(response)["sort"],
+            {"field": "username", "orderingType": "asc"},
+        )
+
+    def test_frontend_config_includes_reply_counts(self):
+        parent = Comment.objects.first()
+        CommentReplyCreateService(
+            author_id=self.author.pk,
+            text="First reply",
+            related_comment_id=parent.pk,
+            target_comment_id=parent.pk,
+        ).create()
+
+        comments = {
+            comment["id"]: comment
+            for comment in self._config(self.client.get("/"))["comments"]
+        }
+
+        self.assertEqual(comments[parent.pk]["reply_count"], 1)
+        self.assertEqual(
+            sum(comment["reply_count"] for comment in comments.values()), 1
+        )
+
+    def test_captcha_refresh_endpoint_returns_image_and_key(self):
         refresh_response = self.client.get(
             "/captcha/refresh/",
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
@@ -1185,77 +1232,6 @@ class CommentListViewTests(TestCase):
         self.assertEqual(refresh_response.status_code, 200)
         self.assertIn("image_url", refresh_response.json())
         self.assertIn("key", refresh_response.json())
-
-    def test_comment_forms_include_html_tag_toolbar(self):
-        response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-        for tag in ("i", "strong", "code", "a"):
-            self.assertEqual(content.count(f'data-tag="{tag}"'), 2)
-        self.assertContains(response, "js/tags.js")
-
-    def test_text_file_dialog_is_available_for_comment_attachments(self):
-        response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="text-file-dialog"')
-        self.assertContains(response, "js/txt.js")
-
-    def test_forms_do_not_include_a_relation_input(self):
-        response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "related_comment_id")
-        self.assertNotContains(response, 'name="related_comment"')
-
-    def test_each_comment_element_includes_its_id_as_data_attribute(self):
-        response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        for comment in response.context["comment_list"]:
-            with self.subTest(comment_id=comment.id):
-                self.assertContains(
-                    response,
-                    f'data-comment-id="{comment.id}"',
-                )
-
-    def test_each_comment_has_a_reply_button(self):
-        response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-        self.assertEqual(
-            content.count('class="comment-reply-button"'),
-            len(response.context["comment_list"]),
-        )
-        self.assertContains(response, "Відповісти")
-        self.assertNotContains(response, "Переглянути відповіді")
-
-    def test_replies_button_is_rendered_only_for_comments_with_replies(self):
-        parent = Comment.objects.first()
-        target = CommentReplyCreateService(
-            author_id=self.author.pk,
-            text="First reply",
-            related_comment_id=parent.pk,
-            target_comment_id=parent.pk,
-        ).create()
-        CommentReplyCreateService(
-            author_id=self.author.pk,
-            text="Reply to first reply",
-            related_comment_id=parent.pk,
-            target_comment_id=target.pk,
-        ).create()
-
-        response = self.client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f'data-comment-id="{parent.pk}"')
-        self.assertContains(response, 'class="comment-view-replies-button"')
-        self.assertContains(response, "Переглянути відповіді (2)")
-        self.assertNotContains(response, "comment-replies-status")
-        self.assertNotContains(response, "Reply to first reply")
-        self.assertContains(response, "window.commentRepliesUrl")
 
     def test_comment_list_shows_remaining_comment_on_second_page(self):
         response = self.client.get("/", {"page": 2})
