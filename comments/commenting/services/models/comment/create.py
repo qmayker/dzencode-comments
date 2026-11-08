@@ -1,8 +1,12 @@
+from html import unescape
+
 from commenting.enums import FileTypeEnum
 from commenting.models import Comment
 from core.services import BaseModelCreateService, BaseModelService
+from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.db import transaction
+from django.utils.html import strip_tags
 from events.events import EventCustomModel, Events
 from events.sender import RedisEventSender
 
@@ -16,7 +20,10 @@ class CommentService(BaseModelService[Comment]):
 
     def clean_text(self, text: str) -> str:
         self.text_result = CommentTextSanitizer().clean(text)
-        return self.text_result.text
+        cleaned_text = self.text_result.text
+        if not unescape(strip_tags(cleaned_text)).strip():
+            raise ValidationError({"text": "Comment cannot be blank."})
+        return cleaned_text
 
     def clean(self):
         self.obj.text = self.clean_text(self.obj.text)

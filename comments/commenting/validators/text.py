@@ -1,9 +1,14 @@
+from html import unescape
 import re
 
 from django.core.exceptions import ValidationError
+from django.utils.html import strip_tags
 
 
 class CommentTextTagsValidator:
+    def validate_text(self, text: str) -> bool:
+        return bool(unescape(strip_tags(text)).strip())
+
     def validate_tags(self, text: str) -> bool:
         stack = []
         pattern = r"<(/?)([a-zA-Z][\w:-]*)\b[^>]*>"
@@ -24,6 +29,9 @@ class CommentTextTagsValidator:
         return len(stack) == 0
 
     def __call__(self, value: str) -> str:
+        if not self.validate_text(value):
+            raise ValidationError("Comment cannot be blank.")
+
         is_valid = self.validate_tags(value)
         if is_valid:
             return

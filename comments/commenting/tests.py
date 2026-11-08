@@ -138,6 +138,33 @@ class CommentServiceTests(TestCase):
         self.assertIsNone(service.obj.pk)
         self.assertEqual(Comment.objects.count(), 0)
 
+    def test_comment_create_service_rejects_text_without_visible_content(self):
+        for text in ("", "   \n\t", "<strong> </strong>", "<i><strong></strong></i>"):
+            with self.subTest(text=text):
+                service = CommentCreateService(
+                    text=text,
+                    author_id=self.author.pk,
+                )
+
+                with self.assertRaises(ValidationError):
+                    service.create()
+
+                self.assertIsNone(service.obj.pk)
+        self.assertEqual(Comment.objects.count(), 0)
+
+    def test_comment_create_service_rejects_text_removed_by_sanitizer(self):
+        service = CommentCreateService(
+            text="<script>hidden</script>",
+            author_id=self.author.pk,
+        )
+
+        with self.assertRaises(ValidationError):
+            service.create()
+
+        self.assertEqual(service.text_result.text, "")
+        self.assertIsNone(service.obj.pk)
+        self.assertEqual(Comment.objects.count(), 0)
+
     def test_create_service_uses_comment_service_and_returns_saved_comment(self):
         service = CommentCreateService(
             text="<span>comment text</span>",
@@ -407,6 +434,27 @@ class CommentCreateApiTests(TestCase):
         self.assertIsNone(response.data["related_comment"])
         self.assertIsNone(response.data["target_comment"])
         self.assertEqual(Comment.objects.get().text, "API comment")
+
+    def test_post_rejects_comment_with_no_text_after_tags_are_removed(self):
+        author = CommentAuthor.objects.create(
+            username="blank-comment-user",
+            email="blank-comment@example.com",
+        )
+
+        response = self.client.post(
+            self.url,
+            data={
+                "author": author.pk,
+                "text": "<script>hidden</script>",
+                **self.captcha_payload(),
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("text", response.data)
+        self.assertIn("Comment cannot be blank.", str(response.data["text"]))
+        self.assertEqual(Comment.objects.count(), 0)
 
     def test_post_rejects_invalid_captcha_without_creating_comment(self):
         author = CommentAuthor.objects.create(

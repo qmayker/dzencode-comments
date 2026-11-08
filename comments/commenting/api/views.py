@@ -149,7 +149,15 @@ class CommentCreateView(CaptchaMixin, APIView):
                 target_comment_id=target_comment.pk,
                 additional_file=additional_file,
             )
-        comment = comment_service.create()
+        try:
+            comment = comment_service.create()
+        except DjangoValidationError as error:
+            detail = (
+                error.message_dict
+                if hasattr(error, "message_dict")
+                else {"detail": error.messages}
+            )
+            raise APIValidationError(detail) from error
         response_data = CommentCreateSerializer(comment).data
         socket = WebSocketCommentEvents()
         if comment.related_comment_id is None:
