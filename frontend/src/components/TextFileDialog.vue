@@ -13,7 +13,7 @@ async function open(url) {
   const currentRequest = ++requestId;
   clearTimeout(closeTimer);
   closing.value = false;
-  status.value = "Завантаження...";
+  status.value = "Загрузка...";
   body.value = "";
   if (!dialog.value.open) {
     dialog.value.showModal();
@@ -63,8 +63,8 @@ defineExpose({ open });
   >
     <div class="text-file-dialog-content">
       <header class="text-file-dialog-header">
-        <h2 id="text-file-title">Текстовий файл</h2>
-        <button type="button" class="text-file-dialog-close" aria-label="Закрити" @click="close">
+        <h2 id="text-file-title">Текстовый файл</h2>
+        <button type="button" class="text-file-dialog-close" aria-label="Закрыть" @click="close">
           ×
         </button>
       </header>

@@ -30,12 +30,12 @@ class CommentTextTagsValidator:
 
     def __call__(self, value: str) -> str:
         if not self.validate_text(value):
-            raise ValidationError("Comment cannot be blank.")
+            raise ValidationError("Комментарий не может быть пустым.")
 
         is_valid = self.validate_tags(value)
         if is_valid:
             return
-        raise ValidationError("Tags are not closed properly")
+        raise ValidationError("Теги закрыты некорректно.")
 
     def deconstruct(self):
         return (

@@ -15,9 +15,9 @@ function href(page) {
 </script>
 
 <template>
-  <nav v-if="numPages > 1" class="pagination" aria-label="Сторінки коментарів">
-    <a v-if="hasPrevious" :href="href(number - 1)">Попередня</a>
-    <span class="page-count">Сторінка {{ number }} з {{ numPages }}</span>
-    <a v-if="hasNext" :href="href(number + 1)">Наступна</a>
+  <nav v-if="numPages > 1" class="pagination" aria-label="Страницы комментариев">
+    <a v-if="hasPrevious" :href="href(number - 1)">Назад</a>
+    <span class="page-count">Страница {{ number }} из {{ numPages }}</span>
+    <a v-if="hasNext" :href="href(number + 1)">Вперёд</a>
   </nav>
 </template>

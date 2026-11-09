@@ -29,12 +29,12 @@ defineExpose({ open });
     class="image-lightbox"
     role="dialog"
     aria-modal="true"
-    aria-label="Зображення коментаря"
+    aria-label="Изображение комментария"
     @click.self="close"
   >
-    <button type="button" class="image-lightbox-close" aria-label="Закрити" @click="close">
+    <button type="button" class="image-lightbox-close" aria-label="Закрыть" @click="close">
       ×
     </button>
-    <img :src="src" alt="Зображення коментаря" />
+    <img :src="src" alt="Изображение комментария" />
   </div>
 </template>

@@ -52,13 +52,21 @@ class CommentCreateSerializer(ModelSerializer):
             return attrs
         if related_comment is None or target_comment is None:
             raise serializers.ValidationError(
-                {"related_comment": "Must be set together with target_comment."}
+                {
+                    "related_comment": (
+                        "Это поле необходимо указать вместе с полем target_comment."
+                    )
+                }
             )
 
         expected_related_id = target_comment.related_comment_id or target_comment.pk
         if related_comment.pk != expected_related_id:
             raise serializers.ValidationError(
-                {"related_comment": "Must be the root comment of the target thread."}
+                {
+                    "related_comment": (
+                        "Укажите корневой комментарий ветки ответа."
+                    )
+                }
             )
         return attrs
 
@@ -106,5 +114,5 @@ class CaptchaValidateSerializer(CaptchaSerializer):
     def validate_methods(self, value: str) -> list[str]:
         methods = [method.strip() for method in value.split(";") if method.strip()]
         if not methods:
-            raise serializers.ValidationError("At least one method is required.")
+            raise serializers.ValidationError("Необходимо указать хотя бы один метод.")
         return methods

@@ -22,7 +22,7 @@ class CommentService(BaseModelService[Comment]):
         self.text_result = CommentTextSanitizer().clean(text)
         cleaned_text = self.text_result.text
         if not unescape(strip_tags(cleaned_text)).strip():
-            raise ValidationError({"text": "Comment cannot be blank."})
+            raise ValidationError({"text": "После очистки запрещенных тегов комментарий остался полностью пустым."})
         return cleaned_text
 
     def clean(self):

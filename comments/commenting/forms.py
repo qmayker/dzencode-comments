@@ -7,7 +7,7 @@ from commenting.validators import FileFormatData
 class CommentCreateForm(forms.Form):
     captcha = CaptchaField()
     additional_file = forms.FileField(
-        label="Файл (необов'язково)",
+        label="Файл (необязательно)",
         required=False,
         widget=forms.ClearableFileInput(
             attrs={
@@ -21,21 +21,21 @@ class CommentCreateForm(forms.Form):
         ),
     )
     username = forms.CharField(
-        label="Ім'я",
+        label="Имя",
         max_length=100,
         widget=forms.TextInput(attrs={"autocomplete": "username"}),
     )
     email = forms.EmailField(
-        label="Електронна пошта",
+        label="Электронная почта",
         widget=forms.EmailInput(attrs={"autocomplete": "email"}),
     )
     home_page = forms.URLField(
-        label="Домашня сторінка",
+        label="Домашняя страница",
         required=False,
         widget=forms.URLInput(attrs={"autocomplete": "url"}),
     )
     text = forms.CharField(
-        label="Коментар",
+        label="Комментарий",
         max_length=2000,
         widget=forms.Textarea(attrs={"rows": 5}),
     )

@@ -6,16 +6,16 @@ const { field, orderingType } = config.sort;
 
 <template>
   <form class="sort-form" method="get">
-    <label for="field">Сортувати за</label>
+    <label for="field">Сортировать по</label>
     <select id="field" name="field">
-      <option value="created" :selected="field === 'created'">Датою створення</option>
-      <option value="username" :selected="field === 'username'">Ім'ям автора</option>
-      <option value="email" :selected="field === 'email'">Електронною поштою</option>
+      <option value="created" :selected="field === 'created'">Дате создания</option>
+      <option value="username" :selected="field === 'username'">Имени автора</option>
+      <option value="email" :selected="field === 'email'">Электронной почте</option>
     </select>
-    <select name="orderingType" aria-label="Напрямок сортування">
-      <option value="desc" :selected="orderingType === 'desc'">За спаданням</option>
-      <option value="asc" :selected="orderingType === 'asc'">За зростанням</option>
+    <select name="orderingType" aria-label="Порядок сортировки">
+      <option value="desc" :selected="orderingType === 'desc'">По убыванию</option>
+      <option value="asc" :selected="orderingType === 'asc'">По возрастанию</option>
     </select>
-    <button type="submit">Застосувати</button>
+    <button type="submit">Применить</button>
   </form>
 </template>

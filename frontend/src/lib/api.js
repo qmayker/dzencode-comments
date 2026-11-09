@@ -1,7 +1,7 @@
 import { config } from "./config";
 
 export function errorMessage(error) {
-  return error instanceof Error ? error.message : "Невідома помилка.";
+  return error instanceof Error ? error.message : "Неизвестная ошибка.";
 }
 
 function getCookie(name) {
@@ -18,7 +18,7 @@ function apiError(data, status) {
     data && typeof data === "object"
       ? Object.values(data).flat().join(" ")
       : "";
-  return new Error(message || `API request failed (${status}).`);
+  return new Error(message || `Ошибка запроса к API (${status}).`);
 }
 
 async function parseJson(response) {
@@ -79,7 +79,7 @@ export async function fetchReplies(commentId) {
     throw apiError(responseData, response.status);
   }
   if (!Array.isArray(responseData)) {
-    throw new Error("The replies API returned an invalid response.");
+    throw new Error("API ответов вернул данные в неверном формате.");
   }
   return responseData;
 }
@@ -90,13 +90,13 @@ export async function fetchCaptcha() {
   });
   const result = await parseJson(response);
   if (!response.ok) {
-    throw new Error(`CAPTCHA refresh failed (${response.status}).`);
+    throw new Error(`Не удалось обновить CAPTCHA (${response.status}).`);
   }
   if (
     typeof result?.image_url !== "string" ||
     typeof result?.key !== "string"
   ) {
-    throw new Error("CAPTCHA refresh returned an invalid response.");
+    throw new Error("При обновлении CAPTCHA получен ответ в неверном формате.");
   }
   return {
     imageUrl: new URL(result.image_url, window.location.href).href,
@@ -107,7 +107,7 @@ export async function fetchCaptcha() {
 export async function fetchTextFile(url) {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Не вдалося завантажити файл (${response.status}).`);
+    throw new Error(`Не удалось загрузить файл (${response.status}).`);
   }
   return response.text();
 }

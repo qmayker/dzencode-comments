@@ -24,14 +24,14 @@ class CommentValidation(BaseValidator[Comment]):
         formats = FileFormatData.get_all_formats()
         if suffix not in formats.all_formats:
             raise ValidationError(
-                {"additional_file": "Unsupported file format"}
+                {"additional_file": "Формат файла не поддерживается."}
             )
 
         if self.obj.file_type == FileTypeEnum.TXT:
             size = self.obj.additional_file.size / 1024
             if size > settings.TXT_FILE_SIZE:
                 raise ValidationError(
-                    {"additional_file": "File size is too big"}
+                    {"additional_file": "Размер файла слишком велик."}
                 )
         elif self.obj.file_type == FileTypeEnum.IMG:
             try:
@@ -39,19 +39,21 @@ class CommentValidation(BaseValidator[Comment]):
                 image.verify()
             except (UnidentifiedImageError, OSError) as error:
                 raise ValidationError(
-                    {"additional_file": "Image is not valid"}
+                    {"additional_file": "Изображение повреждено или имеет неверный формат."}
                 ) from error
 
     def validate_comments(self, related_id: int | None, target_id: int | None):
         if related_id is None and target_id is None:
             return
         if related_id is None or target_id is None:
-            raise ValidationError("Related and target comment IDs must both be set.")
+            raise ValidationError(
+                "Необходимо указать идентификаторы связанного комментария и ответа."
+            )
         target_comment = self.obj.target_comment
         if related_id == target_id:
             if target_comment.related_comment_id is not None:
                 raise ValidationError(
-                    "A reply target must be a main comment in this case."
+                    "В этом случае ответ должен относиться к основному комментарию."
                 )
             return
 
@@ -61,5 +63,5 @@ class CommentValidation(BaseValidator[Comment]):
             or target_comment.related_comment_id != related_id
         ):
             raise ValidationError(
-                "Target comment must be a reply under the related main comment."
+                "Ответ должен относиться к ветке указанного основного комментария."
             )

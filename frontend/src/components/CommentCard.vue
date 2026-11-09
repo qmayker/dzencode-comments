@@ -35,16 +35,16 @@ const hasReplies = computed(
 const repliesLabel = computed(() => {
   const comment = props.comment;
   if (comment.repliesLoading) {
-    return "Завантаження відповідей...";
+    return "Загрузка ответов...";
   }
   if (comment.repliesError) {
-    return `Помилка: ${comment.repliesError}`;
+    return `Ошибка: ${comment.repliesError}`;
   }
   if (comment.repliesExpanded) {
-    return "Сховати відповіді";
+    return "Скрыть ответы";
   }
   const count = Math.max(comment.replyCount, comment.pendingReplies.length);
-  return `Переглянути відповіді (${count})`;
+  return `Показать ответы (${count})`;
 });
 
 function openImage(event) {
@@ -68,7 +68,7 @@ function openImage(event) {
     </header>
 
     <p v-if="showTarget" class="reply-target">
-      У відповідь на коментар {{ comment.target_comment_username }}
+      В ответ на комментарий пользователя {{ comment.target_comment_username }}
     </p>
 
     <div class="comment-body" v-html="comment.text || ''"></div>
@@ -82,7 +82,7 @@ function openImage(event) {
         class="js-open-text-file"
         @click="emit('open-text-file', comment.additional_file)"
       >
-        Відкрити текстовий файл
+        Открыть текстовый файл
       </button>
     </p>
     <p
@@ -90,7 +90,7 @@ function openImage(event) {
       class="comment-attachment"
     >
       <a :href="comment.additional_file" @click="openImage">
-        <img :src="comment.additional_file" alt="Зображення коментаря" loading="lazy" />
+        <img :src="comment.additional_file" alt="Изображение к комментарию" loading="lazy" />
       </a>
     </p>
 
@@ -118,7 +118,7 @@ function openImage(event) {
         :data-comment-author="comment.author_username"
         @click="emit('reply', comment)"
       >
-        Відповісти
+        Ответить
       </button>
       <button
         v-if="hasReplies"

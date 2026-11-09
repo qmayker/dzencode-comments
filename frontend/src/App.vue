@@ -212,13 +212,13 @@ onBeforeUnmount(() => socket?.close());
 <template>
   <main class="page">
     <header class="page-header">
-      <p class="eyebrow">Обговорення</p>
-      <h1>Коментарі</h1>
+      <p class="eyebrow">Обсуждения</p>
+      <h1>Комментарии</h1>
     </header>
 
     <CommentForm
       ref="mainForm"
-      title="Залишити коментар"
+      title="Оставить комментарий"
       title-id="comment-create-title"
       form-id="comment-create-form"
       status-id="comment-form-status"
@@ -230,7 +230,7 @@ onBeforeUnmount(() => socket?.close());
     <Teleport defer :to="replyTarget">
       <CommentForm
         ref="replyForm"
-        title="Відповісти на коментар"
+        title="Ответить на комментарий"
         title-id="comment-reply-title"
         form-id="comment-reply-form"
         status-id="comment-reply-status"
@@ -243,13 +243,13 @@ onBeforeUnmount(() => socket?.close());
 
     <div v-if="pendingNewComments.length" id="new-comments-container" class="new-comments">
       <button id="new-comments-button" type="button" @click="showPendingComments">
-        Переглянути нові коментарі ({{ pendingNewComments.length }})
+        Посмотреть новые комментарии ({{ pendingNewComments.length }})
       </button>
     </div>
 
     <SortForm />
 
-    <section class="comment-list" aria-label="Список коментарів">
+    <section class="comment-list" aria-label="Список комментариев">
       <CommentCard
         v-for="comment in comments"
         :key="comment.id"
@@ -259,7 +259,7 @@ onBeforeUnmount(() => socket?.close());
         @open-text-file="textDialog.open($event)"
         @open-image="lightbox.open($event)"
       />
-      <p v-if="!comments.length" class="empty-state">Коментарів поки немає.</p>
+      <p v-if="!comments.length" class="empty-state">Пока нет комментариев.</p>
     </section>
 
     <TextFileDialog ref="textDialog" />

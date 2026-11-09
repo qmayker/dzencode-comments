@@ -17,9 +17,9 @@ const emit = defineEmits(["submitted"]);
 
 const TAGS = [
   { tag: "i", label: "Курсив" },
-  { tag: "strong", label: "Жирний текст" },
+  { tag: "strong", label: "Жирный" },
   { tag: "code", label: "Код" },
-  { tag: "a", label: "Посилання" },
+  { tag: "a", label: "Ссылка" },
 ];
 
 const values = reactive({
@@ -47,7 +47,7 @@ async function refreshCaptcha() {
     captcha.key = result.key;
     status.value = "";
   } catch (error) {
-    status.value = `Не вдалося оновити CAPTCHA: ${errorMessage(error)}`;
+    status.value = `Не удалось обновить CAPTCHA: ${errorMessage(error)}`;
   } finally {
     captcha.loading = false;
   }
@@ -110,7 +110,7 @@ async function onSubmit() {
   submitting.value = true;
   try {
     if (!values.captchaCode || !captcha.key) {
-      throw new Error("Введіть код CAPTCHA.");
+      throw new Error("Введите код CAPTCHA.");
     }
 
     await props.submit({
@@ -165,7 +165,7 @@ defineExpose({ fillAuthor, focusText, scrollIntoView });
           v-if="captcha.imageUrl"
           :src="captcha.imageUrl"
           class="captcha"
-          alt="captcha"
+          alt="CAPTCHA"
         />
         <input type="hidden" name="captcha_0" :value="captcha.key" />
         <input
@@ -185,12 +185,12 @@ defineExpose({ fillAuthor, focusText, scrollIntoView });
           :disabled="captcha.loading"
           @click="refreshCaptcha"
         >
-          Оновити CAPTCHA
+          Обновить CAPTCHA
         </button>
       </div>
 
       <div class="form-field">
-        <label :for="fieldId('additional_file')">Файл (необов'язково):</label>
+        <label :for="fieldId('additional_file')">Файл (необязательно):</label>
         <input
           :id="fieldId('additional_file')"
           ref="fileInput"
@@ -201,7 +201,7 @@ defineExpose({ fillAuthor, focusText, scrollIntoView });
       </div>
 
       <div class="form-field">
-        <label :for="fieldId('username')">Ім'я:</label>
+        <label :for="fieldId('username')">Имя:</label>
         <input
           :id="fieldId('username')"
           v-model="values.username"
@@ -214,7 +214,7 @@ defineExpose({ fillAuthor, focusText, scrollIntoView });
       </div>
 
       <div class="form-field">
-        <label :for="fieldId('email')">Електронна пошта:</label>
+        <label :for="fieldId('email')">Электронная почта:</label>
         <input
           :id="fieldId('email')"
           v-model="values.email"
@@ -226,7 +226,7 @@ defineExpose({ fillAuthor, focusText, scrollIntoView });
       </div>
 
       <div class="form-field">
-        <label :for="fieldId('home_page')">Домашня сторінка:</label>
+        <label :for="fieldId('home_page')">Домашняя страница:</label>
         <input
           :id="fieldId('home_page')"
           v-model="values.homePage"
@@ -237,8 +237,8 @@ defineExpose({ fillAuthor, focusText, scrollIntoView });
       </div>
 
       <div class="form-field form-field-comment">
-        <label :for="fieldId('text')">Коментар:</label>
-        <div class="tag-toolbar" role="toolbar" aria-label="Форматування коментаря">
+        <label :for="fieldId('text')">Комментарий:</label>
+        <div class="tag-toolbar" role="toolbar" aria-label="Форматирование комментария">
           <button
             v-for="item in TAGS"
             :key="item.tag"
@@ -261,7 +261,7 @@ defineExpose({ fillAuthor, focusText, scrollIntoView });
         ></textarea>
       </div>
 
-      <button type="submit">Надіслати коментар</button>
+      <button type="submit">Отправить комментарий</button>
       <p :id="statusId" role="status" aria-live="polite">{{ visibleStatus }}</p>
     </form>
   </section>

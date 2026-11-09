@@ -1,84 +1,91 @@
-# Production deployment
+# Развёртывание в production
 
-The Compose stack uses Nginx as its only public-facing service. Nginx serves
-collected static files and uploaded media from separate Docker volumes, sends
-regular HTTP requests to Gunicorn, and proxies `/ws/` WebSocket connections to
-Daphne. PostgreSQL stores application data; Redis backs the cache, Channels,
-Celery, and the event listener.
+В стеке Compose единственным общедоступным сервисом является Nginx. Он
+раздаёт собранные статические файлы и загруженные медиафайлы из отдельных томов
+Docker, направляет обычные HTTP-запросы в Gunicorn, а соединения WebSocket по
+пути `/ws/` проксирует в Daphne. PostgreSQL хранит данные приложения; Redis
+используется для кеша, Channels, Celery и обработчика событий.
 
-## Configure and start
+## Настройка и запуск
 
-1. Copy `.env.example` to `.env`. The example values and Compose defaults are
-   for local HTTP testing only. For a public deployment, set `DEBUG=False`,
-   `SECRET_KEY` to a new random value (for example, run
-   `python -c "import secrets; print(secrets.token_urlsafe(64))"`), and
-   `DB_PASSWORD` to a strong database password. Set `ALLOWED_HOSTS` to the
-   public hostnames and `CSRF_TRUSTED_ORIGINS` to their full origins,
-   including `https://` when using HTTPS. Keep `.env` private.
-2. Terminate HTTPS at a trusted proxy in front of this stack and configure that
-   proxy to redirect HTTP traffic to HTTPS. The included Nginx listener is
-   HTTP-only and forwards the `X-Forwarded-Proto` value received from that proxy.
-   Set `SECURE_SSL_REDIRECT=True` and `SECURE_HSTS_SECONDS=31536000` in `.env`
-   only after HTTPS is working, so Django also enforces HTTPS when it sees the
-   trusted proxy's forwarded scheme.
-   Production session and CSRF cookies are marked secure. Restrict access to
-   `HTTP_PORT` (default 80) so clients can reach it only through the trusted proxy.
-3. Reply notification emails use Django's console backend and are written to
-   the output of the process that runs the Celery task.
-4. Build and start the services:
+1. Скопируйте `.env.example` в `.env`. Примерные значения и настройки Compose
+   предназначены только для локального тестирования по HTTP. Для публичного
+   развёртывания задайте `DEBUG=False`, новый случайный ключ в `SECRET_KEY`
+   (например, выполните
+   `python -c "import secrets; print(secrets.token_urlsafe(64))"`) и надёжный
+   пароль базы данных в `DB_PASSWORD`. Укажите публичные имена хостов в
+   `ALLOWED_HOSTS`, а полные адреса источников, включая `https://` при
+   использовании HTTPS, — в `CSRF_TRUSTED_ORIGINS`. Храните `.env` в
+   безопасности.
+2. Настройте завершение HTTPS на доверенном прокси перед этим стеком и
+   перенаправление HTTP-трафика на HTTPS. Включённый Nginx принимает только
+   HTTP и передаёт полученное от прокси значение `X-Forwarded-Proto`. Установите
+   `SECURE_SSL_REDIRECT=True` и `SECURE_HSTS_SECONDS=31536000` в `.env` только
+   после настройки HTTPS: тогда Django также будет принудительно использовать
+   HTTPS, если получит от доверенного прокси соответствующий заголовок.
+   Файлы cookie сессии и CSRF в production помечаются как защищённые. Ограничьте
+   доступ к `HTTP_PORT` (по умолчанию 80), чтобы клиенты могли подключаться
+   только через доверенный прокси.
+3. Письма-уведомления об ответах используют консольный backend Django и
+   выводятся в журнал процесса, выполняющего задачу Celery.
+4. Соберите и запустите сервисы:
 
    ```sh
    docker compose up --build -d
    ```
 
-The Docker build compiles the Vue frontend and includes it in the application
-image. On startup, the web container applies database migrations and collects
-static files before starting Gunicorn. Daphne, Nginx, Celery, and the event
-listener start after the web service is healthy. Only Nginx publishes the
-application port; PostgreSQL and Redis are accessible only on the private
-Compose network (Redis is also bound to host loopback for local development).
+Сборка Docker компилирует интерфейс Vue и включает его в образ приложения. При
+запуске контейнер веб-сервиса применяет миграции базы данных и собирает
+статические файлы, после чего запускает Gunicorn. Daphne, Nginx, Celery и
+обработчик событий запускаются после проверки готовности веб-сервиса. Порт
+приложения публикует только Nginx; PostgreSQL и Redis доступны лишь во
+внутренней сети Compose (Redis также привязан к loopback-интерфейсу хоста для
+локальной разработки).
 
-Application logs from `logging.getLogger("comments")` are written to the console
-at INFO level. When Django `DEBUG=True`, DEBUG-and-higher messages are also
-written to separate files in the persistent `logs` volume: `web.log`,
-`daphne.log`, `celery.log`, and `events.log`. Django and other framework logs
-are discarded. For example, inspect the event listener log with
+Журналы приложения из `logging.getLogger("comments")` выводятся в консоль с
+уровнем INFO. При `DEBUG=True` сообщения уровня DEBUG и выше также записываются
+в отдельные файлы в постоянном томе `logs`: `web.log`, `daphne.log`,
+`celery.log` и `events.log`. Журналы Django и других фреймворков отбрасываются.
+Например, журнал обработчика событий можно посмотреть командой
 `docker compose exec events tail -f /app/logs/events.log`.
 
-This stack initializes a new PostgreSQL database; `migrate` creates its schema
-but does not copy data from the development SQLite database. If existing
-comments or uploaded files must be kept, migrate the database and copy the
-media files into the persistent volumes before directing traffic to this stack.
+Этот стек инициализирует новую базу PostgreSQL: команда `migrate` создаёт её
+структуру, но не копирует данные из SQLite для разработки. Если нужно сохранить
+существующие комментарии или загруженные файлы, перенесите базу данных и
+медиафайлы в постоянные тома до переключения трафика на этот стек.
 
-To create an administrator account:
+Чтобы создать учётную запись администратора:
 
 ```sh
 docker compose exec web python manage.py createsuperuser
 ```
 
-## Local HTTPS
+## Локальный HTTPS
 
-For browser testing on `https://localhost`, create a self-signed certificate and
-start the HTTPS proxy alongside the normal Compose stack:
+Для проверки в браузере по адресу `https://localhost` создайте
+самоподписанный сертификат и запустите HTTPS-прокси вместе с обычным стеком
+Compose:
 
 ```sh
 python scripts/create_local_tls_cert.py
 docker compose -f compose.yml -f compose.local-https.yml up --build -d
 ```
 
-Open [https://localhost](https://localhost). Since this certificate is
-self-signed and not installed as a trusted root, the browser will show a
-certificate warning; accept it only for local development. The private key and
-certificate are stored in the ignored `certs/` directory. To replace them, run
-`python scripts/create_local_tls_cert.py --force`, then restart the stack.
+Откройте [https://localhost](https://localhost). Поскольку сертификат
+самоподписан и не установлен как доверенный корневой, браузер покажет
+предупреждение; принимайте его только при локальной разработке. Закрытый ключ
+и сертификат хранятся в игнорируемом Git каталоге `certs/`. Чтобы заменить их,
+выполните `python scripts/create_local_tls_cert.py --force`, а затем
+перезапустите стек.
 
-## Persistent data
+## Постоянные данные
 
-Back up the `postgres_data`, `media`, and `logs` Docker volumes. Uploaded files
-are stored in `media` and served directly by Nginx; collected application assets
-are stored separately in `staticfiles` and can be recreated by running
-`docker compose restart web`. Redis data is persisted in `redis_data`; it is
-runtime state and does not replace database or media backups.
+Создавайте резервные копии томов Docker `postgres_data`, `media` и `logs`.
+Загруженные файлы хранятся в `media` и напрямую раздаются Nginx; собранные
+ресурсы приложения отдельно хранятся в `staticfiles`. Их можно пересоздать
+командой `docker compose restart web`. Данные Redis сохраняются в `redis_data`;
+это состояние выполнения, оно не заменяет резервные копии базы данных или
+медиафайлов.
 
-Do not use `docker compose down -v` for routine deployment: it removes the
-database, Redis, media, and static-file volumes.
+Не используйте `docker compose down -v` для обычного развёртывания: эта команда
+удаляет тома базы данных, Redis, медиафайлов и статических файлов.

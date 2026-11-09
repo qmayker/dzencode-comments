@@ -453,7 +453,10 @@ class CommentCreateApiTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("text", response.data)
-        self.assertIn("Comment cannot be blank.", str(response.data["text"]))
+        self.assertIn(
+            "Комментарий не может быть пустым.",
+            str(response.data["text"]),
+        )
         self.assertEqual(Comment.objects.count(), 0)
 
     def test_post_rejects_invalid_captcha_without_creating_comment(self):
