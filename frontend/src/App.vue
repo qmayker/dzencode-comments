@@ -31,6 +31,8 @@ const lightbox = ref(null);
 
 let authorLoad = Promise.resolve(null);
 let socket = null;
+let mainCommentSubmissionInProgress = false;
+let queuedSocketComments = [];
 
 const replyTarget = computed(() =>
   activeReplyId.value
@@ -54,24 +56,37 @@ function submitReply(data) {
 }
 
 async function submit(data, isReply) {
-  await authorLoad;
-  const { comment, author } = await createComment({
-    ...data,
-    storedAuthor: currentAuthor.value,
-    targetCommentId: isReply ? activeReplyId.value : null,
-    relatedCommentId: isReply ? activeReplyRootId.value : null,
-  });
+  if (!isReply) {
+    mainCommentSubmissionInProgress = true;
+  }
+  try {
+    await authorLoad;
+    const { comment, author } = await createComment({
+      ...data,
+      storedAuthor: currentAuthor.value,
+      targetCommentId: isReply ? activeReplyId.value : null,
+      relatedCommentId: isReply ? activeReplyRootId.value : null,
+    });
 
-  currentAuthor.value = author;
-  pendingNewComments.value = pendingNewComments.value.filter(
-    (item) => !sameId(item.id, comment.id),
-  );
-  if (comment.related_comment) {
-    appendReplyToThread(comment);
-    activeReplyId.value = null;
-    activeReplyRootId.value = null;
-  } else {
-    comments.unshift(normalizeComment(comment));
+    currentAuthor.value = author;
+    pendingNewComments.value = pendingNewComments.value.filter(
+      (item) => !sameId(item.id, comment.id),
+    );
+    if (comment.related_comment) {
+      appendReplyToThread(comment);
+      activeReplyId.value = null;
+      activeReplyRootId.value = null;
+    } else {
+      comments.unshift(normalizeComment(comment));
+    }
+  } finally {
+    if (!isReply) {
+      mainCommentSubmissionInProgress = false;
+      for (const queuedComment of queuedSocketComments) {
+        receiveComment(queuedComment);
+      }
+      queuedSocketComments = [];
+    }
   }
 }
 
@@ -151,6 +166,10 @@ function appendReplyToThread(reply) {
 
 function receiveComment(comment) {
   if (!comment?.id) {
+    return;
+  }
+  if (mainCommentSubmissionInProgress) {
+    queuedSocketComments.push(comment);
     return;
   }
   const known =
